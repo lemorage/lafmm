@@ -32,6 +32,9 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 [tool.ruff.lint.per-file-ignores]
 "src/lafmm/agent_prompt.py" = ["E501"]
 
+[tool.ty.src]
+exclude = ["skills/"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
