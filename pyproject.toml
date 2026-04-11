@@ -13,6 +13,7 @@ dependencies = [
     "rich",
     "click",
     "textual>=8.2.3",
+    "yfinance",
 ]
 
 [project.scripts]
