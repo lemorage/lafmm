@@ -1,33 +1,31 @@
-import sys
-from pathlib import Path
-
 import click
 
 from lafmm.app import LafmmApp
-from lafmm.loader import load_group, load_market
+from lafmm.init import HUMAN_DATA, get_root, scaffold
+from lafmm.loader import load_market
 
 
 @click.command()
-@click.argument("path", type=click.Path(exists=True, path_type=Path))
-def main(path: Path) -> None:
-    """Livermore's Anticipating Future Movements Map.
+def main() -> None:
+    """Livermore's Anticipating Future Movements Map."""
+    root = get_root()
 
-    Point at a group folder (contains group.toml + CSVs) or a market folder
-    (contains group subfolders) and the map renders itself.
-    """
-    if (path / "group.toml").exists():
-        state = load_group(path)
-    elif _is_market_dir(path):
-        state = load_market(path)
-    else:
-        click.echo("not a group or market folder")
-        click.echo("  group folder needs: group.toml + stock CSVs")
-        click.echo("  market folder needs: subdirectories with group.toml")
-        sys.exit(1)
+    if root is None:
+        root = scaffold()
+        click.echo(f"created {root}/")
+        click.echo()
+        click.echo("  next steps:")
+        click.echo(f"  1. add group folders to {root / HUMAN_DATA}/")
+        click.echo(f"  2. cd {root} && claude")
+        click.echo("     (or codex, or any agent you prefer)")
+        return
 
-    app = LafmmApp(state)
-    app.run()
+    human = root / HUMAN_DATA
+    mkt = load_market(human)
 
+    if not mkt.groups:
+        click.echo(f"no groups found in {human}/")
+        click.echo("  add group folders with group.toml + stock CSVs")
+        return
 
-def _is_market_dir(path: Path) -> bool:
-    return any((d / "group.toml").exists() for d in path.iterdir() if d.is_dir())
+    LafmmApp(mkt).run()
