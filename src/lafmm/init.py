@@ -7,7 +7,8 @@ from pathlib import Path
 LAFMM_DIR = ".lafmm"
 HUMAN_DATA = "data"
 AGENT_DATA = "cache"
-SKILLS = "skills"
+SKILLS_SRC = "skills"
+SKILLS_DST = ".claude/skills"
 
 US_INDICES_GROUP = "us-indices"
 US_INDICES_LEADERS = ("SPY", "QQQ")
@@ -52,8 +53,9 @@ def _agent_md() -> str:
 
 
 def _copy_skills(root: Path) -> None:
-    skills_dst = root / SKILLS
-    skills_src = Path(__file__).resolve().parent.parent.parent / SKILLS
+    skills_dst = root / SKILLS_DST
+    skills_src = Path(__file__).resolve().parent.parent.parent / SKILLS_SRC
+    skills_dst.parent.mkdir(parents=True, exist_ok=True)
     if skills_src.is_dir():
         shutil.copytree(skills_src, skills_dst)
     else:
@@ -74,7 +76,7 @@ def _scaffold_us_indices(root: Path) -> None:
 
 
 def _fetch_us_indices(root: Path) -> None:
-    fetch_script = root / SKILLS / "fetch-prices" / "scripts" / "fetch.py"
+    fetch_script = root / SKILLS_DST / "fetch-prices" / "scripts" / "fetch.py"
     if not fetch_script.exists():
         return
 

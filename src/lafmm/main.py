@@ -1,3 +1,7 @@
+import os
+import shutil
+import subprocess
+
 import click
 
 from lafmm.app import LafmmApp
@@ -13,11 +17,7 @@ def main() -> None:
     if root is None:
         root = scaffold()
         click.echo(f"created {root}/")
-        click.echo()
-        click.echo("  next steps:")
-        click.echo(f"  1. add group folders to {root / HUMAN_DATA}/")
-        click.echo(f"  2. cd {root} && claude")
-        click.echo("     (or codex, or any agent you prefer)")
+        _launch_claude(root)
         return
 
     human = root / HUMAN_DATA
@@ -29,3 +29,15 @@ def main() -> None:
         return
 
     LafmmApp(mkt).run()
+
+
+def _launch_claude(root: os.PathLike[str]) -> None:
+    claude = shutil.which("claude")
+    if claude:
+        if click.confirm("launch claude code?", default=True):
+            subprocess.run([claude], cwd=root, check=False)
+    else:
+        click.echo()
+        click.echo("  claude code not found on PATH.")
+        click.echo("  install: https://claude.ai/download")
+        click.echo(f"  or use any agent CLI: cd {root}")
