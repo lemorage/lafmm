@@ -94,13 +94,15 @@ swing_pct = 8.0
 confirm_pct = 4.0
 ```
 
-**CSV files** — one row per trading day:
+**CSV files** — OHLCV format, one row per trading day:
 
 ```csv
-date,price
-2025-01-02,130.00
-2025-01-03,133.00
+date,open,high,low,close,volume
+2025-01-02,128.50,131.20,127.80,130.00,45123000
+2025-01-03,130.10,134.50,129.60,133.00,38901000
 ```
+
+The engine reads `close` for the Livermore FSM. Other columns support quant skills (ATR, volume analysis).
 
 The filename is the ticker. If it matches a leader name, it's a leader. Any other CSV is auto-discovered as a tracked stock — gets its own engine but doesn't affect Key Price.
 

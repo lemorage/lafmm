@@ -3,20 +3,20 @@
 # requires-python = ">=3.12"
 # dependencies = ["yfinance"]
 # ///
-"""Fetch daily closing prices and append to LAFMM CSV files.
+"""Fetch daily OHLCV prices and append to LAFMM CSV files.
 
 Usage:
     uv run fetch.py TICKER [--csv PATH] [--start DATE] [--days N]
 
 Examples:
     uv run fetch.py NVDA                           # append latest to ~/.lafmm/data/*/NVDA/YYYY.csv
-    uv run fetch.py NVDA --csv data/semis/NVDA.csv # explicit path
+    uv run fetch.py NVDA --csv data/semis/NVDA     # explicit ticker dir
     uv run fetch.py NVDA --start 2026-01-02        # backfill from date
     uv run fetch.py NVDA --days 30                 # last 30 calendar days
 
 CSVs are partitioned by year: each ticker gets a directory with one CSV per year.
+Format: date,open,high,low,close,volume (OHLCV).
 Output is always appended — existing rows are preserved, duplicates skipped.
-Prints each new row added so the agent can see what changed.
 
 SPDX-License-Identifier: GPL-3.0-only
 """
@@ -24,30 +24,57 @@ SPDX-License-Identifier: GPL-3.0-only
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import sys
 from collections import defaultdict
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from _csv import _writer
 
 import yfinance as yf
 
+HEADER = ["date", "open", "high", "low", "close", "volume"]
 
-def fetch_prices(ticker: str, start: date, end: date) -> Sequence[tuple[str, float]]:
+
+@dataclass(frozen=True, slots=True)
+class Bar:
+    date: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+
+
+def fetch_bars(ticker: str, start: date, end: date) -> Sequence[Bar]:
     data = yf.download(ticker, start=start.isoformat(), end=end.isoformat(), progress=False)
     if data is None or data.empty:
         return []
-    close = data["Close"]
-    if hasattr(close, "columns"):
-        close = close.iloc[:, 0]
 
-    import pandas as pd
+    if hasattr(data.columns, "droplevel"):
+        with contextlib.suppress(IndexError, ValueError):
+            data.columns = data.columns.droplevel(1)
 
-    return [
-        (pd.Timestamp(ts).strftime("%Y-%m-%d"), round(float(val), 2))
-        for ts, val in zip(close.index, close.values, strict=True)
-    ]
+    bars: list[Bar] = []
+    for idx, row in data.iterrows():
+        o, h, lo, c, v = (float(x) for x in row.values[:5])
+        bars.append(
+            Bar(
+                date=str(idx)[:10],
+                open=round(o, 2),
+                high=round(h, 2),
+                low=round(lo, 2),
+                close=round(c, 2),
+                volume=int(v),
+            )
+        )
+    return bars
 
 
 def read_existing_dates(path: Path) -> set[str]:
@@ -63,39 +90,49 @@ def read_existing_dates(path: Path) -> set[str]:
     return set()
 
 
-def append_rows_partitioned(ticker_dir: Path, rows: Sequence[tuple[str, float]]) -> int:
+def _write_bar(writer: _writer, bar: Bar) -> None:
+    row = [
+        bar.date,
+        f"{bar.open:.2f}",
+        f"{bar.high:.2f}",
+        f"{bar.low:.2f}",
+        f"{bar.close:.2f}",
+        bar.volume,
+    ]
+    writer.writerow(row)
+    print(",".join(str(v) for v in row))
+
+
+def append_bars_partitioned(ticker_dir: Path, bars: Sequence[Bar]) -> int:
     ticker_dir.mkdir(parents=True, exist_ok=True)
-    by_year: dict[str, list[tuple[str, float]]] = defaultdict(list)
-    for d, price in rows:
-        year = d[:4]
-        by_year[year].append((d, price))
+    by_year: dict[str, list[Bar]] = defaultdict(list)
+    for bar in bars:
+        by_year[bar.date[:4]].append(bar)
 
     added = 0
-    for year, year_rows in sorted(by_year.items()):
+    for year, year_bars in sorted(by_year.items()):
         csv_path = ticker_dir / f"{year}.csv"
         is_new = not csv_path.exists() or csv_path.stat().st_size == 0
         with csv_path.open("a", newline="") as f:
             writer = csv.writer(f)
             if is_new:
-                writer.writerow(["date", "price"])
-            for d, price in year_rows:
-                writer.writerow([d, f"{price:.2f}"])
-                print(f"{d},{price:.2f}")
+                writer.writerow(HEADER)
+            for bar in year_bars:
+                _write_bar(writer, bar)
                 added += 1
     return added
 
 
-def append_rows_flat(csv_path: Path, rows: Sequence[tuple[str, float]]) -> int:
+def append_bars_flat(csv_path: Path, bars: Sequence[Bar]) -> int:
     is_new = not csv_path.exists() or csv_path.stat().st_size == 0
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     with csv_path.open("a", newline="") as f:
         writer = csv.writer(f)
         if is_new:
-            writer.writerow(["date", "price"])
-        for d, price in rows:
-            writer.writerow([d, f"{price:.2f}"])
-            print(f"{d},{price:.2f}")
-    return len(rows)
+            writer.writerow(HEADER)
+        for bar in bars:
+            _write_bar(writer, bar)
+    return len(bars)
 
 
 def find_ticker_dir(ticker: str) -> Path | None:
@@ -141,30 +178,30 @@ def run_fetch(ticker: str, target: Path, start: date) -> None:
         sys.exit(0)
 
     existing_dates = read_existing_dates(target)
-    rows = fetch_prices(ticker, start, today + timedelta(days=1))
-    new_rows = sorted(
-        [(d, p) for d, p in rows if d not in existing_dates],
-        key=lambda r: r[0],
+    bars = fetch_bars(ticker, start, today + timedelta(days=1))
+    new_bars = sorted(
+        [b for b in bars if b.date not in existing_dates],
+        key=lambda b: b.date,
     )
 
-    if not new_rows:
+    if not new_bars:
         last = max(existing_dates) if existing_dates else "empty"
         print(f"{ticker}: no new data (has through {last})")
         sys.exit(0)
 
     if target.is_dir() or not target.suffix:
-        added = append_rows_partitioned(target, new_rows)
+        added = append_bars_partitioned(target, new_bars)
     else:
-        added = append_rows_flat(target, new_rows)
+        added = append_bars_flat(target, new_bars)
 
     total = len(existing_dates) + added
     print(f"\n{ticker}: +{added} rows → {target} (total: {total})")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Fetch daily prices for LAFMM")
+    parser = argparse.ArgumentParser(description="Fetch daily OHLCV prices for LAFMM")
     parser.add_argument("ticker", help="stock ticker symbol (e.g. NVDA)")
-    parser.add_argument("--csv", type=Path, default=None, help="path to CSV file or ticker dir")
+    parser.add_argument("--csv", type=Path, default=None, help="path to ticker dir or CSV file")
     parser.add_argument(
         "--start",
         type=date.fromisoformat,

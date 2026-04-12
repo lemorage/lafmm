@@ -70,7 +70,7 @@ def _scaffold_us_indices(root: Path) -> None:
         ticker_dir.mkdir(exist_ok=True)
         csv_path = ticker_dir / f"{date.today().year}.csv"
         if not csv_path.exists():
-            csv_path.write_text("date,price\n")
+            csv_path.write_text("date,open,high,low,close,volume\n")
 
 
 def _fetch_us_indices(root: Path) -> None:

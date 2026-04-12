@@ -11,7 +11,7 @@ def load_prices(ticker_dir: Path) -> list[tuple[str, float]]:
     for csv_file in sorted(ticker_dir.glob("*.csv")):
         with csv_file.open() as f:
             reader = csv.DictReader(f)
-            rows.extend((row["date"], float(row["price"])) for row in reader)
+            rows.extend((row["date"], float(row["close"])) for row in reader)
     rows.sort(key=lambda r: r[0])
     return rows
 

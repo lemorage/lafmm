@@ -90,19 +90,22 @@ uv run scripts/fetch.py AVGO --days 90
 
 ## What it produces
 
-CSV files with two columns, one row per trading day:
+CSV files with OHLCV columns, one row per trading day:
 
 ```csv
-date,price
-2026-01-02,130.00
-2026-01-03,130.36
+date,open,high,low,close,volume
+2026-01-02,128.50,131.20,127.80,130.00,45123000
+2026-01-03,130.10,131.50,129.60,130.36,38901000
 ```
 
 - **date**: YYYY-MM-DD, trading days only
-- **price**: adjusted closing price, 2 decimal places
+- **open/high/low/close**: adjusted prices, 2 decimal places
+- **volume**: daily trading volume
 
-Adjusted close accounts for stock splits and dividends, giving the
-engine a continuous price series without artificial jumps.
+Adjusted prices account for stock splits and dividends, giving the
+engine a continuous price series. The engine reads `close` for the
+Livermore FSM. `open/high/low` are available for quant skills (ATR,
+candlestick patterns). `volume` supports future liquidity analysis.
 
 ## Prerequisites
 

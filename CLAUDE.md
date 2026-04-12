@@ -264,5 +264,15 @@ Run with `uv run pytest`.
 
 ---
 
+## Domain Invariant: Engine Uses Close Only
+
+CSVs store full OHLCV data (`date,open,high,low,close,volume`). The engine reads **only `close`**. This is by design, not by oversight.
+
+Livermore's formalized system recorded closing prices. The engine implements his exact rules (Rules 1-10). Changing it to use intraday high/low would create a different system, not his.
+
+Livermore himself watched the tape all day — he used intraday action to *interpret* what the closing price meant, not to *change* what he recorded. That maps to our architecture: the engine records close. Skills use OHLCV to enrich analysis around what the engine outputs — volume confirmation, intraday pivot tests, ATR computation. The engine never changes. Skills add context.
+
+---
+
 *"Perfection is achieved, not when there is nothing more to add, but when there is nothing left to take away."*
 — Antoine de Saint-Exupery

@@ -493,13 +493,18 @@ Pure logic at the core (`models`, `engine`). Orchestration in the middle (`group
 data/
 ├── semis/
 │   ├── group.toml        # name, leaders, thresholds
-│   ├── NVDA.csv           # leader
-│   ├── AVGO.csv           # leader
-│   └── AMD.csv            # tracked (auto-discovered)
+│   ├── NVDA/              # each ticker is a directory
+│   │   └── 2026.csv       # year-partitioned OHLCV
+│   ├── AVGO/
+│   │   └── 2026.csv
+│   └── AMD/               # tracked (auto-discovered)
+│       └── 2026.csv
 ├── energy/
 │   ├── group.toml
-│   ├── XOM.csv
-│   └── CVX.csv
+│   ├── XOM/
+│   │   └── 2026.csv
+│   └── CVX/
+│       └── 2026.csv
 ```
 
 ***
@@ -649,7 +654,7 @@ Built on **Textual** (from the Rich ecosystem). Three-level drill-down:
 
 I/O lives at the edge. Pure logic at the core.
 
-- `load_prices(ticker_dir) -> list[tuple[str, float]]` — reads all year-partitioned CSVs in a ticker directory, concatenates chronologically
+- `load_prices(ticker_dir) -> list[tuple[str, float]]` — reads all year-partitioned OHLCV CSVs in a ticker directory, extracts `close` column, concatenates chronologically
 - `load_group(folder) -> GroupState` — reads `group.toml` + all CSVs, initializes engines
 - `load_market(root) -> MarketState` — scans subdirectories for group folders
 
