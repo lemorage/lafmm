@@ -64,8 +64,11 @@ def _scaffold_us_indices(root: Path) -> None:
     group_dir = root / HUMAN_DATA / US_INDICES_GROUP
     group_dir.mkdir(parents=True, exist_ok=True)
     (group_dir / "group.toml").write_text(US_INDICES_TOML)
+
     for ticker in (*US_INDICES_LEADERS, *US_INDICES_TRACKED):
-        csv_path = group_dir / f"{ticker}.csv"
+        ticker_dir = group_dir / ticker
+        ticker_dir.mkdir(exist_ok=True)
+        csv_path = ticker_dir / f"{date.today().year}.csv"
         if not csv_path.exists():
             csv_path.write_text("date,price\n")
 
@@ -75,12 +78,15 @@ def _fetch_us_indices(root: Path) -> None:
     if not fetch_script.exists():
         return
 
-    start = f"{date.today().year}-01-01"
+    year = str(date.today().year)
+    start = f"{year}-01-01"
     group_dir = root / HUMAN_DATA / US_INDICES_GROUP
 
     for ticker in (*US_INDICES_LEADERS, *US_INDICES_TRACKED):
-        csv_path = group_dir / f"{ticker}.csv"
-        subprocess.run(
+        csv_path = group_dir / ticker / f"{year}.csv"
+        result = subprocess.run(
             [sys.executable, str(fetch_script), ticker, "--csv", str(csv_path), "--start", start],
             check=False,
         )
+        if result.returncode != 0:
+            print(f"warning: failed to fetch {ticker}", file=sys.stderr)

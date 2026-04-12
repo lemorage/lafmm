@@ -4,11 +4,8 @@ description: >
   Fetch daily closing prices for stocks and ETFs, updating LAFMM CSV data
   files. Use this skill whenever the user wants to update price data, populate
   a new group's CSVs, backfill historical data, or when you notice data is
-  stale during analysis. Also use it when the user says "fetch prices",
-  "update prices", "get latest data", "pull prices for X", "backfill X",
-  or any variation that implies they want fresh price data in their CSVs.
-  Use it proactively before running sync or analysis when you see CSVs are
-  missing or outdated.
+  stale during analysis. Use it proactively before running sync or analysis
+  when you see CSVs are missing or outdated.
 ---
 
 # Fetch Prices
@@ -18,18 +15,35 @@ Yahoo Finance via yfinance. It handles the mechanical work of fetching,
 deduplicating, and appending — so the data is always in the right format
 for the engine.
 
+## Data layout
+
+Each ticker is a directory with one CSV per year:
+
+```
+data/us-indices/
+├── group.toml
+├── SPY/
+│   ├── 2025.csv
+│   └── 2026.csv
+├── QQQ/
+│   └── 2026.csv
+```
+
+This keeps files manageable over years. The loader reads all year files
+for a ticker and concatenates them chronologically.
+
 ## The script
 
-`scripts/fetch.py` does one thing: fetch closing prices for a ticker and
-append new rows to its CSV. It is idempotent — running it twice on the same
-day produces the same result.
+`scripts/fetch.py` fetches closing prices for a ticker and writes to
+year-partitioned CSVs. It is idempotent — running it twice produces the
+same result.
 
 ```bash
-# Append latest prices (auto-detects last date in CSV)
+# Append latest prices (auto-discovers ticker dir under ~/.lafmm/data/)
 uv run scripts/fetch.py NVDA
 
-# Explicit CSV path
-uv run scripts/fetch.py NVDA --csv ~/.lafmm/data/semis/NVDA.csv
+# Explicit target (directory or file)
+uv run scripts/fetch.py NVDA --csv ~/.lafmm/data/semis/NVDA
 
 # Backfill from a specific date
 uv run scripts/fetch.py NVDA --start 2026-01-02
@@ -38,46 +52,41 @@ uv run scripts/fetch.py NVDA --start 2026-01-02
 uv run scripts/fetch.py NVDA --days 30
 ```
 
-The script prints each new row as it appends, so you can see exactly what
-changed. If the CSV is already up to date, it says so and exits.
+The script prints each new row as it appends. If the data is already up
+to date, it says so and exits.
 
 ## How to use it
 
 ### Updating one ticker
 
 ```bash
-uv run scripts/fetch.py NVDA --csv ~/.lafmm/data/semis/NVDA.csv
+uv run scripts/fetch.py SPY
 ```
+
+Auto-discovers `~/.lafmm/data/us-indices/SPY/` and appends to the
+current year's CSV.
 
 ### Updating an entire group
 
-Read `group.toml` to get the ticker list, then fetch each one:
+Read `group.toml` for tickers, then fetch each:
 
 ```bash
-# For each CSV in the group directory:
-uv run scripts/fetch.py NVDA --csv ~/.lafmm/data/semis/NVDA.csv
-uv run scripts/fetch.py AVGO --csv ~/.lafmm/data/semis/AVGO.csv
+uv run scripts/fetch.py SPY
+uv run scripts/fetch.py QQQ
+uv run scripts/fetch.py DIA
+uv run scripts/fetch.py IWM
 ```
 
 ### Populating a new group
 
-When a new group is created (either manually or via build-watchlist), the
-CSVs are empty. Backfill with enough history for the engine to establish
-its initial state — 60 trading days is a reasonable starting point:
+Backfill with enough history for the engine to establish its state:
 
 ```bash
-uv run scripts/fetch.py NVDA --csv ~/.lafmm/data/semis/NVDA.csv --days 90
-uv run scripts/fetch.py AVGO --csv ~/.lafmm/data/semis/AVGO.csv --days 90
+uv run scripts/fetch.py NVDA --days 90
+uv run scripts/fetch.py AVGO --days 90
 ```
 
-90 calendar days gives roughly 60 trading days after weekends and holidays
-are excluded.
-
-### Updating all groups
-
-Walk through `~/.lafmm/data/`, read each `group.toml` for tickers, and
-fetch each one. Leaders and tracked stocks are all just CSVs — no special
-handling needed.
+90 calendar days gives roughly 60 trading days.
 
 ## What it produces
 
@@ -87,31 +96,25 @@ CSV files with two columns, one row per trading day:
 date,price
 2026-01-02,130.00
 2026-01-03,130.36
-2026-01-06,129.10
 ```
 
-- **date**: YYYY-MM-DD, trading days only (no weekends, no holidays)
+- **date**: YYYY-MM-DD, trading days only
 - **price**: adjusted closing price, 2 decimal places
 
-Adjusted close accounts for stock splits and dividends. This means the
-engine sees a continuous price series without artificial jumps from
-corporate actions.
+Adjusted close accounts for stock splits and dividends, giving the
+engine a continuous price series without artificial jumps.
 
 ## Prerequisites
 
 The script uses PEP 723 inline metadata — `uv run` automatically installs
 yfinance into a cached environment on first use. No manual setup needed.
-The only requirement is that `uv` is available on PATH.
 
 ## Error handling
 
-- **Ticker not found**: yfinance returns empty data. The script prints a
-  message and exits without modifying the CSV.
-- **Network failure**: yfinance raises an exception. The script exits
-  without modifying the CSV. Run again when connectivity is restored.
-- **CSV doesn't exist yet**: the script creates it with the header row
-  and appends data. Safe to run on an empty group.
-- **Duplicate dates**: skipped automatically. The script reads existing
-  dates from the CSV and only appends new ones.
+- **Ticker not found**: prints a message, exits without modifying CSVs.
+- **Network failure**: exits without modifying CSVs. Run again later.
+- **Empty ticker dir**: creates it and writes data. Safe on new groups.
+- **Duplicate dates**: skipped automatically.
+- **Cross-year data**: automatically partitioned into correct year files.
 
-No partial writes — the CSV is either unchanged or has new complete rows.
+No partial writes — CSVs are either unchanged or have new complete rows.

@@ -649,7 +649,7 @@ Built on **Textual** (from the Rich ecosystem). Three-level drill-down:
 
 I/O lives at the edge. Pure logic at the core.
 
-- `load_prices(path) -> list[tuple[str, float]]` — reads a CSV with `date,price` columns
+- `load_prices(ticker_dir) -> list[tuple[str, float]]` — reads all year-partitioned CSVs in a ticker directory, concatenates chronologically
 - `load_group(folder) -> GroupState` — reads `group.toml` + all CSVs, initializes engines
 - `load_market(root) -> MarketState` — scans subdirectories for group folders
 

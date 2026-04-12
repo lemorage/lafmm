@@ -6,10 +6,14 @@ from lafmm.group import init_group
 from lafmm.models import Col, GroupConfig, GroupState, MarketState
 
 
-def load_prices(path: Path) -> list[tuple[str, float]]:
-    with path.open() as f:
-        reader = csv.DictReader(f)
-        return [(row["date"], float(row["price"])) for row in reader]
+def load_prices(ticker_dir: Path) -> list[tuple[str, float]]:
+    rows: list[tuple[str, float]] = []
+    for csv_file in sorted(ticker_dir.glob("*.csv")):
+        with csv_file.open() as f:
+            reader = csv.DictReader(f)
+            rows.extend((row["date"], float(row["price"])) for row in reader)
+    rows.sort(key=lambda r: r[0])
+    return rows
 
 
 def load_group(folder: Path) -> GroupState:
@@ -28,9 +32,9 @@ def load_group(folder: Path) -> GroupState:
     )
 
     prices: dict[str, list[tuple[str, float]]] = {}
-    for csv_file in sorted(folder.glob("*.csv")):
-        ticker = csv_file.stem.upper()
-        prices[ticker] = load_prices(csv_file)
+    for child in sorted(folder.iterdir()):
+        if child.is_dir() and (rows := load_prices(child)):
+            prices[child.name.upper()] = rows
 
     return init_group(config, prices)
 
