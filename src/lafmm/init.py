@@ -13,14 +13,8 @@ SKILLS_DST = ".claude/skills"
 US_INDICES_GROUP = "us-indices"
 US_INDICES_LEADERS = ("SPY", "QQQ")
 US_INDICES_TRACKED = ("DIA", "IWM")
-# TODO: compute swing_pct from ATR after fetching initial prices
-# instead of hardcoding.
-US_INDICES_TOML = """\
-name = "US Indices"
-leaders = ["SPY", "QQQ"]
-swing_pct = 5.0
-confirm_pct = 2.5
-"""
+FALLBACK_SWING_PCT = 5.0
+FALLBACK_CONFIRM_PCT = 2.5
 
 
 def get_root() -> Path | None:
@@ -42,6 +36,7 @@ def scaffold() -> Path:
     _copy_skills(root)
     _scaffold_us_indices(root)
     _fetch_us_indices(root)
+    _tune_us_indices(root)
 
     return root
 
@@ -62,10 +57,27 @@ def _copy_skills(root: Path) -> None:
         skills_dst.mkdir(exist_ok=True)
 
 
+def _write_group_toml(
+    toml_path: Path,
+    swing_pct: float,
+    confirm_pct: float,
+) -> None:
+    toml_path.write_text(
+        f'name = "US Indices"\n'
+        f'leaders = ["SPY", "QQQ"]\n'
+        f"swing_pct = {swing_pct}\n"
+        f"confirm_pct = {confirm_pct}\n"
+    )
+
+
 def _scaffold_us_indices(root: Path) -> None:
     group_dir = root / HUMAN_DATA / US_INDICES_GROUP
     group_dir.mkdir(parents=True, exist_ok=True)
-    (group_dir / "group.toml").write_text(US_INDICES_TOML)
+    _write_group_toml(
+        group_dir / "group.toml",
+        FALLBACK_SWING_PCT,
+        FALLBACK_CONFIRM_PCT,
+    )
 
     for ticker in (*US_INDICES_LEADERS, *US_INDICES_TRACKED):
         ticker_dir = group_dir / ticker
@@ -73,6 +85,29 @@ def _scaffold_us_indices(root: Path) -> None:
         csv_path = ticker_dir / f"{date.today().year}.csv"
         if not csv_path.exists():
             csv_path.write_text("date,open,high,low,close,volume\n")
+
+
+def _tune_us_indices(root: Path) -> None:
+    atr_script = root / SKILLS_DST / "tune-thresholds" / "scripts" / "atr.py"
+    if not atr_script.exists():
+        return
+
+    group_dir = root / HUMAN_DATA / US_INDICES_GROUP
+    result = subprocess.run(
+        [sys.executable, str(atr_script), str(group_dir), "--json"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return
+
+    import json
+
+    data = json.loads(result.stdout)
+    swing_pct = float(data["swing_pct"])
+    confirm_pct = float(data["confirm_pct"])
+    _write_group_toml(group_dir / "group.toml", swing_pct, confirm_pct)
 
 
 def _fetch_us_indices(root: Path) -> None:
