@@ -33,6 +33,8 @@ def scaffold() -> Path:
     (root / "AGENT.md").write_text(_agent_md())
     (root / "CLAUDE.md").write_text("@AGENT.md\n")
 
+    _scaffold_profile(root)
+    _scaffold_accounts(root)
     _copy_skills(root)
     _scaffold_us_indices(root)
     _fetch_us_indices(root)
@@ -47,6 +49,60 @@ def _agent_md() -> str:
     return AGENT_PROMPT
 
 
+# ── Profile ──────────────────────────────────────────────────────────
+
+PROFILE_MD = """\
+# Profile
+
+## Experience
+<!-- PLACEHOLDER: e.g., "2 years trading US equities, started with ETFs" -->
+
+## Risk Tolerance
+<!-- PLACEHOLDER: max drawdown you can stomach, e.g., "15% max drawdown" -->
+
+## Goals
+<!-- PLACEHOLDER: e.g., "grow capital 15-20% annually, learn systematically" -->
+
+## Known Biases
+<!-- PLACEHOLDER: patterns you want the agent to flag, e.g., "I hold losers too long" -->
+
+## Trading System
+
+### Entry Criteria
+<!-- PLACEHOLDER: what signals do you act on? -->
+
+### Exit Criteria
+<!-- PLACEHOLDER: when do you get out? -->
+
+### Position Sizing
+<!-- PLACEHOLDER: method, e.g., "2% risk per trade, half-Kelly" -->
+
+### Concentration Limits
+<!-- PLACEHOLDER: e.g., "max 5 positions, max 30% in one sector" -->
+
+### Holding Period
+<!-- PLACEHOLDER: e.g., "swing trades, 2-10 days" -->
+
+### Hard Rules
+<!-- PLACEHOLDER: rules you never break, e.g., "never average down" -->
+"""
+
+
+def _scaffold_profile(root: Path) -> None:
+    (root / "profile.md").write_text(PROFILE_MD)
+
+
+# ── Accounts ─────────────────────────────────────────────────────────
+
+
+def _scaffold_accounts(root: Path) -> None:
+    accounts = root / "accounts"
+    accounts.mkdir()
+
+
+# ── Skills ───────────────────────────────────────────────────────────
+
+
 def _copy_skills(root: Path) -> None:
     skills_dst = root / SKILLS_DST
     skills_src = Path(__file__).resolve().parent.parent.parent / SKILLS_SRC
@@ -55,6 +111,9 @@ def _copy_skills(root: Path) -> None:
         shutil.copytree(skills_src, skills_dst)
     else:
         skills_dst.mkdir(exist_ok=True)
+
+
+# ── US Indices ───────────────────────────────────────────────────────
 
 
 def _write_group_toml(
