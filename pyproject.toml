@@ -18,6 +18,7 @@ dependencies = [
 
 [project.scripts]
 lafmm = "lafmm.main:main"
+lafmm-sync = "lafmm.sync_cache:main"
 
 [build-system]
 requires = ["uv_build>=0.11.4,<0.12.0"]
