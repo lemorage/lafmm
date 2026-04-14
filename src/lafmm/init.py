@@ -34,7 +34,9 @@ def scaffold() -> Path:
     (root / "CLAUDE.md").write_text("@AGENT.md\n")
 
     _scaffold_profile(root)
+    _scaffold_insights(root)
     _scaffold_accounts(root)
+    _configure_claude(root)
     _copy_skills(root)
     _scaffold_us_indices(root)
     _fetch_us_indices(root)
@@ -92,12 +94,39 @@ def _scaffold_profile(root: Path) -> None:
     (root / "profile.md").write_text(PROFILE_MD)
 
 
+# ── Insights ────────────────────────────────────────────────────────
+
+
+def _scaffold_insights(root: Path) -> None:
+    insights = root / "insights"
+    insights.mkdir()
+    year = str(date.today().year)
+    (insights / f"{year}.md").write_text(f"# Agent Insights — {year}\n")
+
+
 # ── Accounts ─────────────────────────────────────────────────────────
 
 
 def _scaffold_accounts(root: Path) -> None:
     accounts = root / "accounts"
     accounts.mkdir()
+
+
+# ── Claude Code Configuration ───────────────────────────────────────
+
+CLAUDE_SETTINGS = """\
+{
+  "autoMemoryEnabled": true,
+  "autoMemoryDirectory": "memory"
+}
+"""
+
+
+def _configure_claude(root: Path) -> None:
+    claude_dir = root / ".claude"
+    claude_dir.mkdir(exist_ok=True)
+    (root / "memory").mkdir(exist_ok=True)
+    (claude_dir / "settings.json").write_text(CLAUDE_SETTINGS)
 
 
 # ── Skills ───────────────────────────────────────────────────────────
