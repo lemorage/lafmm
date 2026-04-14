@@ -47,7 +47,8 @@ Sequence:
    Open with: "Before we start — a few quick questions so I can tailor analysis to you."
    If no trading system yet, write "No formal system yet — developing" and move on.
 2. First account — ask broker name, account type, instruments, fees.
-   Create accounts/{name}/ with account.toml and journal/ directory.
+   Create accounts/{name}/ with account.toml (include tracked_since = today's date)
+   and journal/ directory.
 
 After setup, print:
   Profile saved.

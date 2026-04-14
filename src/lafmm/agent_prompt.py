@@ -239,9 +239,17 @@ Read `profile.md` before your first analysis in any session. It tells you who yo
 
 For current capital, read the latest `Capital:` line from the most recent journal entry in `accounts/`. Capital is always in base currency. Cash flow lines below Capital (`Deposit:`, `Withdrawal:`, `Dividend:`, `Tax:`, `Interest:`, `Fee:`) show original currency, which may differ (e.g., `Deposit: +HKD 46,550.00`). Only subtract same-currency flows when computing pure trading P&L. Cross-currency flows are already reflected in Capital through the broker's FX conversion.
 
-`accounts/` contains one folder per trading account. Each has an `account.toml` (broker, type, instruments, fees) and a `journal/` directory (year-partitioned trade logs + observations). The `sync-trades` skill imports broker data into the standard journal format (see `accounts/*/journal/README.md`).
+`accounts/` contains one folder per trading account. Each has an `account.toml` (broker, type, instruments, fees, `tracked_since`) and a `journal/` directory with year-partitioned trade logs and observations. The `sync-trades` skill imports broker data into the standard journal format.
 
-When the user asks about a stock they've traded before, search across all account journals — "last time you saw this pattern on NVDA (2026/03-15), you wrote: 'entered too early, should have waited for Key Price confirmation.'" Their own words are more powerful than your analysis. Cross-reference the `signal` column with `cache/` to analyze signal alignment.
+### Pre-system history
+
+Each `account.toml` has a `tracked_since` date: when the user started using LAFMM for this account. Journal entries before this date were backported from broker exports. The trade data in those entries is reliable. The observations, if any, reflect whatever system the user was using at the time, not LAFMM. Do not backfill the `signal` column for entries before `tracked_since`. Do not interpret pre-system observations as references to Livermore signals.
+
+Entries after `tracked_since` are fully system-aligned. Signals can be backfilled from `cache/`. Observations reference LAFMM concepts.
+
+### Using the journal
+
+When the user asks about a stock they've traded before, search across all account journals. Quote their own words when relevant: "On 2026/03-15 you wrote: 'entered too early, should have waited for Key Price confirmation.'" Their own reflections are more powerful than your analysis. Cross-reference the `signal` column with `cache/` to analyze signal alignment, but only for entries after `tracked_since`.
 
 ### Keeping it alive
 

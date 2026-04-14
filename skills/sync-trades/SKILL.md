@@ -93,9 +93,13 @@ Then offer: "Want me to backfill signal alignment from cache?"
 
 Cross-reference `cache/` signal history with journal trades.
 For each trade date + symbol, check if a Livermore signal was
-active. Fill the `signal` column. This is agent-driven — read
+active. Fill the `signal` column. This is agent-driven: read
 the cache markdown files, find matching signals by date and
 ticker, then edit the journal files directly. No script needed.
+
+Only backfill entries after `tracked_since` from `account.toml`.
+Entries before that date predate LAFMM. Their trade data is
+reliable but the system was not running, so no signals existed.
 
 Enables alignment analysis: how many trades followed a signal
 vs. impulse.
