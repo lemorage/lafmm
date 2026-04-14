@@ -98,8 +98,8 @@ Create a folder in `data/` with a `group.toml` and ticker directories:
 ```toml
 name = "Semiconductors"
 leaders = ["NVDA", "AVGO"]
-swing_pct = 8.0
-confirm_pct = 4.0
+swing_pct = 5.0
+confirm_pct = 2.5
 ```
 
 **CSV files** — OHLCV format, one row per trading day:

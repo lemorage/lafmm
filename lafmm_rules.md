@@ -663,8 +663,8 @@ I/O lives at the edge. Pure logic at the core.
 ```toml
 name = "Semiconductors"         # display name
 leaders = ["NVDA", "AVGO"]      # exactly 2, match CSV filenames
-swing_pct = 8.0                 # swing as % of starting price (default: 6.0)
-confirm_pct = 4.0               # confirm as % (default: 3.0)
+swing_pct = 5.0                 # swing as % of starting price (default: 5.0)
+confirm_pct = 2.5               # confirm as % (default: 2.5)
 start_col = "UT"                # initial trend: "UT" or "DT" (default: "UT")
 ```
 

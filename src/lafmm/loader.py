@@ -26,8 +26,8 @@ def load_group(folder: Path) -> GroupState:
     config = GroupConfig(
         name=raw.get("name", folder.name),
         leaders=leaders,
-        swing_pct=float(raw.get("swing_pct", 6.0)),
-        confirm_pct=float(raw.get("confirm_pct", 3.0)),
+        swing_pct=float(raw.get("swing_pct", 5.0)),
+        confirm_pct=float(raw.get("confirm_pct", 2.5)),
         start_col=start_col,
     )
 

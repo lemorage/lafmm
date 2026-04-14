@@ -107,8 +107,8 @@ def read_group_config(
         raw = tomllib.load(f)
     name = raw.get("name", group_dir.name)
     leaders = (raw["leaders"][0], raw["leaders"][1])
-    swing_pct = float(raw.get("swing_pct", 6.0))
-    confirm_pct = float(raw.get("confirm_pct", 3.0))
+    swing_pct = float(raw.get("swing_pct", 5.0))
+    confirm_pct = float(raw.get("confirm_pct", 2.5))
     return name, leaders, swing_pct, confirm_pct
 
 

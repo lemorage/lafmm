@@ -145,7 +145,7 @@ class EngineConfig:
         return cls(swing=swing, confirm=swing / 2.0, ticker=ticker)
 
     @classmethod
-    def for_stock_pct(cls, ticker: str, price: float, swing_pct: float = 6.0) -> EngineConfig:
+    def for_stock_pct(cls, ticker: str, price: float, swing_pct: float = 5.0) -> EngineConfig:
         swing = price * swing_pct / 100.0
         return cls(swing=swing, confirm=swing / 2.0, ticker=ticker)
 
@@ -177,8 +177,8 @@ type GroupTrend = Literal["bullish", "bearish", "neutral"]
 class GroupConfig:
     name: str
     leaders: tuple[str, str]
-    swing_pct: float = 6.0
-    confirm_pct: float = 3.0
+    swing_pct: float = 5.0
+    confirm_pct: float = 2.5
     start_col: Col = Col.UT
 
 
