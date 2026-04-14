@@ -59,6 +59,8 @@ Each trading day gets a journal file: `journal/YYYY/MM-DD.md`
 
 Capital: $13,036.74
 Dividend: +USD 0.42 (GOOG)
+Tax: -USD 0.06 (GOOG)
+Interest: +USD 4.23
 
 ## Trades
 
@@ -71,7 +73,7 @@ Dividend: +USD 0.42 (GOOG)
 ```
 
 - **Capital**: total account value (cash + positions) from NAV in Base
-- **Cash flows**: deposits, withdrawals, dividends in original currency
+- **Cash flows**: deposits, withdrawals, dividends, tax, interest, fees in original currency
 - **signal**: starts as `—`, backfilled later from `cache/`
 
 ## After import

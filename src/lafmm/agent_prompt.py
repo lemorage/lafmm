@@ -233,7 +233,7 @@ Read `profile.md` before your first analysis in any session. It tells you who yo
 - **Experienced trader with a defined system** → be concise, reference their rules from the Trading System section, note when a signal aligns or conflicts with their stated criteria.
 - **User with known biases** → if they've noted "I tend to hold losers too long," flag when a DANGER or SELL signal suggests they might be doing it again.
 
-For current capital, read the latest `Capital:` line from the most recent journal entry in `accounts/`. Capital is always in base currency. When `Deposit:`, `Withdrawal:`, `Dividend:`, or `Interest:` lines appear below Capital, they show the original currency — which may differ (e.g., `Deposit: +HKD 46,550.00`). Only subtract same-currency cash flows when computing pure trading P&L. Cross-currency flows are already reflected in the Capital number through the broker's FX conversion.
+For current capital, read the latest `Capital:` line from the most recent journal entry in `accounts/`. Capital is always in base currency. Cash flow lines below Capital (`Deposit:`, `Withdrawal:`, `Dividend:`, `Tax:`, `Interest:`, `Fee:`) show original currency, which may differ (e.g., `Deposit: +HKD 46,550.00`). Only subtract same-currency flows when computing pure trading P&L. Cross-currency flows are already reflected in Capital through the broker's FX conversion.
 
 `accounts/` contains one folder per trading account. Each has an `account.toml` (broker, type, instruments, fees) and a `journal/` directory (year-partitioned trade logs + observations). The `sync-trades` skill imports broker data into the standard journal format (see `accounts/*/journal/README.md`).
 

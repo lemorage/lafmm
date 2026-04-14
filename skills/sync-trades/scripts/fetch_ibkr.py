@@ -32,6 +32,9 @@ GET_URL = (
 )
 
 
+_NETWORK_ERRORS = (requests.ConnectionError, requests.Timeout)
+
+
 def _backoff(attempt: int, base: float = 1.0, cap: float = 60.0) -> float:
     delay = min(base * (2**attempt), cap)
     return delay + random.uniform(0, delay * 0.5)
@@ -49,7 +52,7 @@ def _get_with_retry(
     for attempt in range(max_attempts):
         try:
             resp = requests.get(url, params=params, timeout=30)
-        except (requests.ConnectionError, requests.Timeout):
+        except _NETWORK_ERRORS:
             wait = _backoff(attempt)
             _log(f"connection failed, retrying in {wait:.1f}s...")
             time.sleep(wait)

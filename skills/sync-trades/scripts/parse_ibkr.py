@@ -30,6 +30,79 @@ from pathlib import Path
 
 ORDER_MAP: Mapping[str, str] = {"LMT": "limit", "MKT": "market", "STP": "stop"}
 
+JOURNAL_README = """\
+# Journal
+
+## File convention
+
+One file per trading day: `{YEAR}/{MM-DD}.md`
+
+## Format
+
+Each file starts with a capital snapshot, then a trades table, then observations.
+
+### Capital
+
+```
+Capital: $52,340.00
+```
+
+Total account value for that day (cash + positions), in base currency,
+from broker export.
+
+On days with non-trading cash movements, lines below Capital show the
+original currency:
+
+```
+Capital: $6,893.96
+Deposit: +HKD 46,550.00
+```
+
+```
+Capital: $73,250.00
+Deposit: +$20,000.00
+Dividend: +$150.00 (GOOG)
+Tax: -$22.50 (GOOG)
+Interest: +$4.23
+Fee: -$10.00
+```
+
+Line types:
+- **Deposit/Withdrawal**: cash transfers in/out
+- **Dividend**: stock dividends
+- **Tax**: withholding tax on dividends
+- **Interest**: broker interest received (+) or margin interest paid (-)
+- **Fee**: data fees, platform fees
+
+Capital is always base currency. Cash flow lines show original currency,
+which may differ for international transfers.
+
+### Trades
+
+| time | symbol | side | qty | price | fees | order | pnl | open_close | signal |
+|------|--------|------|-----|-------|------|-------|-----|------------|--------|
+
+- **time**: HH:MM local, or `--:--`
+- **symbol**: ticker, uppercase
+- **side**: `buy` or `sell`
+- **qty**: shares, or `2c` for contracts
+- **price**: fill price
+- **fees**: commission + fees
+- **order**: `market`, `limit`, `stop`, or `—`
+- **pnl**: realized P&L from broker. `—` on opens.
+- **open_close**: `O` (opening), `C` (closing), or `—`
+- **signal**: Livermore signal if active, or `—`
+
+### Observations
+
+Freeform text below trades. What you saw, felt, learned.
+
+## Import
+
+The `sync-trades` skill writes daily files in this format.
+Drop your broker CSV and tell the agent to import it.
+"""
+
 
 @dataclass(frozen=True, slots=True)
 class Trade:
@@ -122,9 +195,17 @@ def normalize_cash(raw: Sequence[dict[str, str]]) -> dict[str, list[str]]:
             label = "Deposit" if amount > 0 else "Withdrawal"
             sign = "+" if amount > 0 else "-"
             by_date[date_part].append(f"{label}: {sign}{ccy} {abs(amount):,.2f}")
-        elif "Dividend" in typ:
+        elif "Dividend" in typ or "Payment in Lieu" in typ:
             sym = f" ({symbol})" if symbol else ""
             by_date[date_part].append(f"Dividend: +{ccy} {amount:.2f}{sym}")
+        elif "Withholding Tax" in typ:
+            sym = f" ({symbol})" if symbol else ""
+            by_date[date_part].append(f"Tax: -{ccy} {abs(amount):.2f}{sym}")
+        elif "Interest" in typ:
+            sign = "+" if amount > 0 else "-"
+            by_date[date_part].append(f"Interest: {sign}{ccy} {abs(amount):.2f}")
+        elif "Fee" in typ or "Other Fee" in typ:
+            by_date[date_part].append(f"Fee: -{ccy} {abs(amount):.2f}")
 
     return dict(by_date)
 
@@ -167,12 +248,22 @@ def _format_day(
     return "\n".join(lines)
 
 
+def _ensure_journal_readme(journal_dir: Path) -> None:
+    readme = journal_dir / "README.md"
+    if readme.exists():
+        return
+    journal_dir.mkdir(parents=True, exist_ok=True)
+    readme.write_text(JOURNAL_README)
+
+
 def write_journal(
     journal_dir: Path,
     trades: Sequence[Trade],
     cash: dict[str, list[str]],
     nav: dict[str, float],
 ) -> ImportStats:
+    _ensure_journal_readme(journal_dir)
+
     trades_by_date: dict[str, list[Trade]] = defaultdict(list)
     for t in trades:
         trades_by_date[t.date].append(t)

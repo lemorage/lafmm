@@ -52,10 +52,15 @@ Select these 13 fields:
 
 ### Types
 
-Select only:
+Select these:
 
 - **Deposits & Withdrawals**
 - **Dividends**
+- **Payment in Lieu of Dividends**
+- **Withholding Tax**
+- **Broker Interest Received**
+- **Broker Interest Paid**
+- **Other Fees**
 
 Leave everything else unchecked.
 
@@ -162,8 +167,8 @@ data. Dedup skips existing entries. No date management needed.
 | Realized P/L | pnl |
 | Open/Close Indicator | open_close |
 
-Cash Transactions become `Deposit:`, `Withdrawal:`, `Dividend:`
-lines. NAV in Base becomes the `Capital:` line.
+Cash Transactions become `Deposit:`, `Withdrawal:`, `Dividend:`,
+`Tax:`, `Interest:`, `Fee:` lines. NAV in Base becomes `Capital:`.
 
 ## IBKR-specific behavior
 
