@@ -207,6 +207,8 @@ In market.md: >60% of groups bullish = market bullish. >60% bearish = market bea
 
 Refer to this when explaining *why* the engine produced a specific output. Not needed for daily analysis.
 
+**The engine reads only `close` from OHLCV data.** Open, high, low, and volume are available for quant skills but never enter the engine.
+
 ### Swing and confirm
 
 - **Swing** — how far price must move to trigger a column transition (~6 points for stocks, ~12 for Key Price)

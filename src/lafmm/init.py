@@ -1,9 +1,11 @@
+import os
 import shutil
 import subprocess
 import sys
 from datetime import date
 from pathlib import Path
 
+VERSION = "0.1.0"
 LAFMM_DIR = ".lafmm"
 HUMAN_DATA = "data"
 AGENT_DATA = "cache"
@@ -17,13 +19,17 @@ FALLBACK_SWING_PCT = 5.0
 FALLBACK_CONFIRM_PCT = 2.5
 
 
+def _lafmm_home() -> Path:
+    return Path(os.environ.get("LAFMM_HOME", Path.home() / LAFMM_DIR))
+
+
 def get_root() -> Path | None:
-    root = Path.home() / LAFMM_DIR
+    root = _lafmm_home()
     return root if root.is_dir() else None
 
 
 def scaffold() -> Path:
-    root = Path.home() / LAFMM_DIR
+    root = _lafmm_home()
     if root.exists():
         return root
 
@@ -42,7 +48,57 @@ def scaffold() -> Path:
     _fetch_us_indices(root)
     _tune_us_indices(root)
 
+    (root / ".version").write_text(VERSION)
     return root
+
+
+def ensure_structure(root: Path) -> None:
+    version_file = root / ".version"
+    if version_file.exists() and version_file.read_text().strip() == VERSION:
+        return
+
+    for d in (HUMAN_DATA, AGENT_DATA, "insights", "memory", "accounts"):
+        (root / d).mkdir(exist_ok=True)
+
+    (root / "AGENT.md").write_text(_agent_md())
+    (root / "CLAUDE.md").write_text("@AGENT.md\n")
+    _merge_claude_settings(root)
+    _update_shipped_skills(root)
+
+    version_file.write_text(VERSION)
+
+
+def _merge_claude_settings(root: Path) -> None:
+    import json
+
+    settings_path = root / ".claude" / "settings.json"
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    (root / "memory").mkdir(exist_ok=True)
+
+    existing: dict[str, object] = {}
+    if settings_path.exists():
+        existing = json.loads(settings_path.read_text())
+
+    existing["autoMemoryEnabled"] = True
+    existing["autoMemoryDirectory"] = "memory"
+    settings_path.write_text(json.dumps(existing, indent=2) + "\n")
+
+
+def _update_shipped_skills(root: Path) -> None:
+    skills_dst = root / SKILLS_DST
+    skills_src = Path(__file__).resolve().parent.parent.parent / SKILLS_SRC
+    skills_dst.mkdir(parents=True, exist_ok=True)
+
+    if not skills_src.is_dir():
+        return
+
+    for skill in skills_src.iterdir():
+        if not skill.is_dir():
+            continue
+        target = skills_dst / skill.name
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(skill, target)
 
 
 def _agent_md() -> str:

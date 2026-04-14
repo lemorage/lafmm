@@ -5,7 +5,7 @@ import subprocess
 import click
 
 from lafmm.app import LafmmApp
-from lafmm.init import HUMAN_DATA, get_root, scaffold
+from lafmm.init import HUMAN_DATA, ensure_structure, get_root, scaffold
 from lafmm.loader import load_market
 
 
@@ -20,6 +20,7 @@ def main() -> None:
         _launch_claude(root)
         return
 
+    ensure_structure(root)
     human = root / HUMAN_DATA
     mkt = load_market(human)
 
