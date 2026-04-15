@@ -38,6 +38,7 @@ def scaffold() -> Path:
     (root / AGENT_DATA).mkdir()
     (root / "AGENT.md").write_text(_agent_md())
     (root / "CLAUDE.md").write_text("@AGENT.md\n")
+    (root / ".python").write_text(sys.executable)
 
     _scaffold_profile(root)
     _scaffold_insights(root)
@@ -62,6 +63,7 @@ def ensure_structure(root: Path) -> None:
 
     (root / "AGENT.md").write_text(_agent_md())
     (root / "CLAUDE.md").write_text("@AGENT.md\n")
+    (root / ".python").write_text(sys.executable)
     _merge_claude_settings(root)
     _update_shipped_skills(root)
 

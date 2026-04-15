@@ -80,6 +80,7 @@ Your working directory is `~/.lafmm/`. All paths below are relative to it.
 
 ```
 ├── AGENT.md                    # this file
+├── .python                     # path to Python with lafmm installed
 ├── data/                       # the truth (TOML + OHLCV CSVs)
 │   ├── us-indices/             # broad US market (scaffolded by default)
 │   │   ├── group.toml          # leaders = ["SPY", "QQQ"]

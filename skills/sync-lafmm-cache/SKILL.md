@@ -21,17 +21,17 @@ must be in sync with the data for your analysis to be current.
 ## The command
 
 ```bash
-lafmm-sync
+$(cat ~/.lafmm/.python) -m lafmm.sync_cache
 ```
 
-That's it. The command reads all groups from `~/.lafmm/data/`, runs the
-engine on every ticker's price history, and writes markdown files to
-`~/.lafmm/cache/`. It prints each file it writes.
+The `.python` file records the Python interpreter that has the lafmm
+package installed. It is written during scaffold (`uv run lafmm`) and
+points to the project's virtual environment Python.
 
 **Options** (rarely needed):
 
 ```bash
-lafmm-sync --data /path/to/data --cache /path/to/cache
+$(cat ~/.lafmm/.python) -m lafmm.sync_cache --data /path/to/data --cache /path/to/cache
 ```
 
 Override the default `~/.lafmm/data` and `~/.lafmm/cache` paths. Useful
@@ -80,7 +80,7 @@ state to worry about.
 
 **The daily-update pattern:**
 ```
-fetch-prices (all tickers) → lafmm-sync → read cache → analyze
+fetch-prices (all tickers) → sync → read cache → analyze
 ```
 
 This is the standard daily workflow. Fetch fresh prices, regenerate

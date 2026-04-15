@@ -3,8 +3,11 @@
 Loads all groups via the engine, renders each as markdown, and writes
 to cache/. The cache mirrors data/ — same group names, same tickers.
 
-Usage as CLI:
-    lafmm-sync [--data DIR] [--cache DIR]
+Usage from ~/.lafmm/ (agent context):
+    $(cat .python) -m lafmm.sync_cache
+
+Usage from project directory:
+    uv run lafmm-sync
 
 Usage as library:
     from lafmm.sync_cache import sync_market
