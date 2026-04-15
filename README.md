@@ -39,6 +39,7 @@ Group trend comes from Key Price, not individual stocks. Market trend = majority
 ├── accounts/                   # broker configs + trade journals
 │   └── {name}/                 # one folder per trading account
 │       ├── account.toml        # broker, type, instruments, fees
+│       ├── capital/            # daily account value (NAV)
 │       └── journal/            # trade logs + observations
 ├── insights/                   # agent's observations about you
 ├── memory/                     # Claude Code auto-memory

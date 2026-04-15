@@ -9,9 +9,13 @@ from lafmm.init import HUMAN_DATA, ensure_structure, get_root, scaffold
 from lafmm.loader import load_market
 
 
-@click.command()
-def main() -> None:
+@click.group(invoke_without_command=True)
+@click.pass_context
+def main(ctx: click.Context) -> None:
     """Livermore's Anticipating Future Movements Map."""
+    if ctx.invoked_subcommand is not None:
+        return
+
     root = get_root()
 
     if root is None:
@@ -30,6 +34,36 @@ def main() -> None:
         return
 
     LafmmApp(mkt).run()
+
+
+# ── Stats subcommand ─────────────────────────────────────────────────
+
+
+@main.command()
+@click.argument("account", required=False)
+@click.option("--period", "-p", default=None, help="2026, 2026-Q1, 2026-03, 30d, or start:end")
+@click.option("--benchmark/--no-benchmark", default=True, help="Compare against SPY")
+def stats(account: str | None, period: str | None, benchmark: bool) -> None:
+    """Show trading performance statistics."""
+    from lafmm.stats import _resolve_account, _run_compute, render_stats
+
+    root = get_root()
+    if root is None:
+        click.echo("run 'lafmm' first to set up")
+        return
+
+    account_dir = _resolve_account(root / "accounts", account)
+    journal = account_dir / "journal"
+    if not journal.is_dir() or not any(journal.rglob("*.md")):
+        click.echo(f"no trade data in {account_dir.name}/")
+        click.echo("  use the sync-trades skill to import broker data first")
+        return
+
+    data = _run_compute(root, account_dir, period, benchmark)
+    render_stats(data)
+
+
+# ── Bootstrap ────────────────────────────────────────────────────────
 
 
 SEED_PROMPT = """\
