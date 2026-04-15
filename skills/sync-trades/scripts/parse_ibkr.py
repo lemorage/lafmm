@@ -5,7 +5,7 @@
 """Parse IBKR Flex Query CSV and write LAFMM journal entries.
 
 Usage:
-    uv run parse_ibkr.py CSV_FILE JOURNAL_DIR
+    uv run parse_ibkr.py CSV_FILE ACCOUNT_DIR
 
 Reads an IBKR Flex Query CSV export (with section codes enabled),
 parses trades, cash flows, and NAV data, and writes year-partitioned
@@ -190,11 +190,14 @@ def normalize_cash(raw: Sequence[dict[str, str]]) -> dict[str, list[str]]:
         ccy = c["CurrencyPrimary"]
         symbol = c.get("Symbol", "")
         typ = c["Type"]
+        fx_rate = float(c.get("FXRateToBase", "1") or "1")
+        usd_amount = abs(amount * fx_rate)
+        usd_suffix = f" (USD {usd_amount:,.2f})" if ccy != "USD" else ""
 
         if "Deposit" in typ or "Withdrawal" in typ:
             label = "Deposit" if amount > 0 else "Withdrawal"
             sign = "+" if amount > 0 else "-"
-            by_date[date_part].append(f"{label}: {sign}{ccy} {abs(amount):,.2f}")
+            by_date[date_part].append(f"{label}: {sign}{ccy} {abs(amount):,.2f}{usd_suffix}")
         elif "Dividend" in typ or "Payment in Lieu" in typ:
             sym = f" ({symbol})" if symbol else ""
             by_date[date_part].append(f"Dividend: +{ccy} {amount:.2f}{sym}")
@@ -301,25 +304,66 @@ def write_journal(
     )
 
 
+def write_capital(capital_dir: Path, nav: dict[str, float]) -> int:
+    capital_dir.mkdir(parents=True, exist_ok=True)
+
+    by_year: dict[str, list[tuple[str, float]]] = defaultdict(list)
+    for date_str, value in sorted(nav.items()):
+        by_year[date_str[:4]].append((date_str, value))
+
+    new_rows = 0
+    for year, rows in sorted(by_year.items()):
+        csv_path = capital_dir / f"{year}.csv"
+
+        existing: set[str] = set()
+        if csv_path.exists():
+            with csv_path.open() as f:
+                existing = {r["date"] for r in csv.DictReader(f)}
+
+        new = [(d, v) for d, v in rows if _nav_date(d) not in existing]
+        if not new:
+            continue
+
+        is_new = not csv_path.exists() or csv_path.stat().st_size == 0
+        with csv_path.open("a", newline="") as f:
+            writer = csv.writer(f)
+            if is_new:
+                writer.writerow(["date", "capital"])
+            for d, v in new:
+                writer.writerow([_nav_date(d), f"{v:.2f}"])
+                new_rows += 1
+
+    return new_rows
+
+
+def _nav_date(d: str) -> str:
+    if len(d) == 8 and "-" not in d:
+        return f"{d[:4]}-{d[4:6]}-{d[6:8]}"
+    return d
+
+
 def main() -> None:
     if len(sys.argv) < 3:
-        print("usage: parse_ibkr.py CSV_FILE JOURNAL_DIR", file=sys.stderr)
+        print("usage: parse_ibkr.py CSV_FILE ACCOUNT_DIR", file=sys.stderr)
         sys.exit(1)
 
     csv_path = Path(sys.argv[1])
-    journal_dir = Path(sys.argv[2])
+    account_dir = Path(sys.argv[2])
+    journal_dir = account_dir / "journal"
+    capital_dir = account_dir / "capital"
 
     csv_text = csv_path.read_text()
     raw_trades, raw_cash, nav = parse_csv(csv_text)
     trades = normalize_trades(raw_trades)
     cash = normalize_cash(raw_cash)
     stats = write_journal(journal_dir, trades, cash, nav)
+    capital_rows = write_capital(capital_dir, nav)
 
     forex = len(raw_trades) - len(trades)
     date_range = ""
     if trades:
         dates = sorted({t.date for t in trades})
-        date_range = f" ({dates[0]} → {dates[-1]})"
+        date_range = f"({dates[0]} → {dates[-1]})"
 
     print(
         json.dumps(
@@ -329,6 +373,7 @@ def main() -> None:
                 "skipped": stats.skipped,
                 "cash_flows": stats.cash_flows,
                 "forex_filtered": forex,
+                "capital_rows": capital_rows,
                 "date_range": date_range.strip(),
             }
         )

@@ -12,18 +12,21 @@ Get trade data from broker into the journal at
 `accounts/{name}/journal/`. Two scripts handle the work:
 
 - `scripts/fetch_ibkr.py` fetches CSV from IBKR's Flex Web Service API
-- `scripts/parse_ibkr.py` parses CSV and writes journal markdown files
+- `scripts/parse_ibkr.py` parses CSV and writes journal + daily capital
 
 ## Manual mode
 
 User provides a CSV file:
 
 ```bash
-uv run scripts/parse_ibkr.py /path/to/LAFMM.csv accounts/{name}/journal/
+uv run scripts/parse_ibkr.py /path/to/LAFMM.csv accounts/{name}/
 ```
 
-The script detects IBKR format, parses trades/cash/NAV, writes
-journal files. Existing dates are skipped. Safe to re-run.
+The script parses trades/cash/NAV and writes:
+- `journal/` — trade entries for days with activity
+- `capital/` — daily account value (every trading day from NAV)
+
+Existing dates are skipped. Safe to re-run.
 
 ## Auto mode
 
@@ -35,7 +38,7 @@ uv run scripts/fetch_ibkr.py \
   --query-id "$(toml get accounts/{name}/account.toml broker.api.query_id)" \
   --out /tmp/trades.csv
 
-uv run scripts/parse_ibkr.py /tmp/trades.csv accounts/{name}/journal/
+uv run scripts/parse_ibkr.py /tmp/trades.csv accounts/{name}/
 ```
 
 Read token and query_id from `accounts/{name}/account.toml`:

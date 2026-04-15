@@ -70,13 +70,17 @@ Select: **Detail**
 
 ### Fields
 
-Select these 5 fields:
+Select these 6 fields:
 
 - Date/Time
 - Type
 - Amount
 - Currency
 - Symbol
+- FXRateToBase
+
+`FXRateToBase` converts non-USD amounts to USD. The parse script
+uses it to show exact USD equivalents for cross-currency flows.
 
 ## Net Asset Value (NAV) in Base configuration
 
