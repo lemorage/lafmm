@@ -44,6 +44,9 @@ uv run scripts/parse_ibkr.py /tmp/trades.csv accounts/{name}/
 Read token and query_id from `accounts/{name}/account.toml`:
 
 ```toml
+[broker]
+name = "Interactive Brokers"
+
 [broker.api]
 type = "ibkr-flex"
 token = "..."

@@ -144,6 +144,9 @@ Breakout by Day:                 No
 Configure API credentials in `account.toml`:
 
 ```toml
+[broker]
+name = "Interactive Brokers"
+
 [broker.api]
 type = "ibkr-flex"
 token = "your-flex-web-service-token"
