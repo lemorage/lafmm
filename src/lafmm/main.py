@@ -63,6 +63,29 @@ def stats(account: str | None, period: str | None, benchmark: bool) -> None:
     render_stats(data)
 
 
+# ── Sync subcommand ──────────────────────────────────────────────────
+
+
+@main.command()
+def sync() -> None:
+    """Regenerate cache/ from data/."""
+    from lafmm.sync_cache import sync_market
+
+    root = get_root()
+    if root is None:
+        click.echo("run 'lafmm' first to set up")
+        return
+
+    data_dir = root / HUMAN_DATA
+    if not data_dir.exists() or not any(data_dir.iterdir()):
+        click.echo("no data to sync")
+        click.echo("  add group folders to data/ with group.toml + stock CSVs")
+        return
+
+    cache_dir = root / "cache"
+    sync_market(data_dir, cache_dir)
+
+
 # ── Bootstrap ────────────────────────────────────────────────────────
 
 
