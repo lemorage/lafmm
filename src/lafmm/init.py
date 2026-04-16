@@ -49,13 +49,56 @@ def scaffold() -> Path:
     _fetch_us_indices(root)
     _tune_us_indices(root)
 
-    (root / ".version").write_text(VERSION)
+    _write_version(root / ".version", None)
     return root
+
+
+def _read_version(version_file: Path) -> str | None:
+    if not version_file.exists():
+        return None
+    return version_file.read_text().split("\n", 1)[0].strip()
+
+
+def _ver_tuple(v: str) -> tuple[int, ...]:
+    return tuple(int(x) for x in v.split("."))
+
+
+def _parse_changelog() -> dict[str, list[str]]:
+    changelog = Path(__file__).resolve().parent.parent.parent / "CHANGELOG.md"
+    if not changelog.exists():
+        return {}
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in changelog.read_text().splitlines():
+        if line.startswith("## "):
+            current = line[3:].strip()
+        elif current and line.startswith("- "):
+            sections.setdefault(current, []).append(line[2:])
+    return sections
+
+
+def _collect_notes(old: str | None) -> list[str]:
+    old_t = _ver_tuple(old) if old else (0, 0, 0)
+    notes: list[str] = []
+    for ver_str, items in sorted(_parse_changelog().items()):
+        if _ver_tuple(ver_str) > old_t:
+            notes.extend(items)
+    return notes
+
+
+def _write_version(version_file: Path, old: str | None) -> None:
+    notes = _collect_notes(old)
+    lines = [VERSION]
+    if notes:
+        lines.append("")
+        lines.extend(f"- {note}" for note in notes)
+    version_file.write_text("\n".join(lines) + "\n")
 
 
 def ensure_structure(root: Path) -> None:
     version_file = root / ".version"
-    if version_file.exists() and version_file.read_text().strip() == VERSION:
+    old = _read_version(version_file)
+    if old == VERSION:
         return
 
     for d in (HUMAN_DATA, AGENT_DATA, "insights", "memory", "accounts"):
@@ -67,7 +110,26 @@ def ensure_structure(root: Path) -> None:
     _merge_claude_settings(root)
     _update_shipped_skills(root)
 
-    version_file.write_text(VERSION)
+    _write_version(version_file, old)
+
+
+MANAGED_CLAUDE_SETTINGS: dict[str, object] = {
+    "autoMemoryEnabled": True,
+    "autoMemoryDirectory": "memory",
+    "hooks": {
+        "SessionStart": [
+            {
+                "matcher": "startup|resume",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "cat .version 2>/dev/null || true",
+                    }
+                ],
+            }
+        ],
+    },
+}
 
 
 def _merge_claude_settings(root: Path) -> None:
@@ -81,8 +143,7 @@ def _merge_claude_settings(root: Path) -> None:
     if settings_path.exists():
         existing = json.loads(settings_path.read_text())
 
-    existing["autoMemoryEnabled"] = True
-    existing["autoMemoryDirectory"] = "memory"
+    existing.update(MANAGED_CLAUDE_SETTINGS)
     settings_path.write_text(json.dumps(existing, indent=2) + "\n")
 
 
@@ -172,19 +233,12 @@ def _scaffold_accounts(root: Path) -> None:
 
 # ── Claude Code Configuration ───────────────────────────────────────
 
-CLAUDE_SETTINGS = """\
-{
-  "autoMemoryEnabled": true,
-  "autoMemoryDirectory": "memory"
-}
-"""
-
 
 def _configure_claude(root: Path) -> None:
     claude_dir = root / ".claude"
     claude_dir.mkdir(exist_ok=True)
     (root / "memory").mkdir(exist_ok=True)
-    (claude_dir / "settings.json").write_text(CLAUDE_SETTINGS)
+    _merge_claude_settings(root)
 
 
 # ── Skills ───────────────────────────────────────────────────────────
