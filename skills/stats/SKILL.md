@@ -39,7 +39,7 @@ The compute script reads journal entries and daily capital CSV:
 **Capital**: start/end capital, deposits, time-weighted return (TWR)
 **Risk**: max drawdown, drawdown duration, win/loss streaks, Sharpe ratio
 **Costs**: total fees, fees as % of P&L, dividends, tax, interest
-**Behavior**: signal vs impulse trades (and win rate for each), order type distribution
+**Behavior**: signal vs impulse vs pre-system trades, win rates, order type distribution
 **Exposure**: symbols traded, top symbols by P&L, monthly P&L
 **Benchmark**: your return vs SPY over the same period
 

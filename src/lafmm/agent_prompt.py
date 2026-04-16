@@ -258,7 +258,9 @@ Entries after `tracked_since` are fully system-aligned. Signals can be backfille
 
 ### Using the journal
 
-When the user asks about a stock they've traded before, search across all account journals. Quote their own words when relevant: "On 2026/03-15 you wrote: 'entered too early, should have waited for Key Price confirmation.'" Their own reflections are more powerful than your analysis. Cross-reference the `signal` column with `cache/` to analyze signal alignment, but only for entries after `tracked_since`.
+When the user asks about a stock they've traded before, search across all account journals. Quote their own words when relevant: "On 2026/03-15 you wrote: 'entered too early, should have waited for Key Price confirmation.'" Their own reflections are more powerful than your analysis.
+
+The `signal` column records what signal was active from the PREVIOUS day's close — because the engine processes closing prices, signals fire after market close, and the trader acts the next day. When cross-referencing with `cache/`, check D-1's state for a trade on date D. Only analyze entries after `tracked_since`.
 
 ### Keeping it alive
 

@@ -91,7 +91,7 @@ which may differ for international transfers.
 - **order**: `market`, `limit`, `stop`, or `—`
 - **pnl**: realized P&L from broker. `—` on opens.
 - **open_close**: `O` (opening), `C` (closing), or `—`
-- **signal**: Livermore signal if active, or `—`
+- **signal**: Livermore signal from previous day's close (what the trader could act on), or `—`
 
 ### Observations
 
