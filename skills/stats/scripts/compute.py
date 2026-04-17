@@ -404,9 +404,7 @@ def _behavior(
             sum(1 for t in impulse if t.pnl > 0) / len(impulse) * 100 if impulse else 0.0
         ),
         "pre_system_win_rate": (
-            sum(1 for t in pre_system if t.pnl > 0) / len(pre_system) * 100
-            if pre_system
-            else 0.0
+            sum(1 for t in pre_system if t.pnl > 0) / len(pre_system) * 100 if pre_system else 0.0
         ),
         "limit_orders": sum(1 for t in all_trades if t.order == "limit"),
         "market_orders": sum(1 for t in all_trades if t.order == "market"),

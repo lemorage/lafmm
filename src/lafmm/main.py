@@ -43,8 +43,11 @@ def main(ctx: click.Context) -> None:
 @click.argument("account", required=False)
 @click.option("--period", "-p", default=None, help="2026, 2026-Q1, 2026-03, 30d, or start:end")
 @click.option("--benchmark/--no-benchmark", default=True, help="Compare against SPY")
-def stats(account: str | None, period: str | None, benchmark: bool) -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output JSON instead of visual")
+def stats(account: str | None, period: str | None, benchmark: bool, as_json: bool) -> None:
     """Show trading performance statistics."""
+    import json as json_mod
+
     from lafmm.stats import render_stats, resolve_account, run_compute
 
     root = get_root()
@@ -60,7 +63,10 @@ def stats(account: str | None, period: str | None, benchmark: bool) -> None:
         return
 
     data = run_compute(root, account_dir, period, benchmark)
-    render_stats(data)
+    if as_json:
+        click.echo(json_mod.dumps(data, indent=2))
+    else:
+        render_stats(data)
 
 
 # ── Sync subcommand ──────────────────────────────────────────────────
