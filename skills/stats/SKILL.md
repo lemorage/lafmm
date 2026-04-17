@@ -13,16 +13,14 @@ Compute trading statistics from journal data and present them.
 
 ## Quick use
 
-For the terminal display:
-
 ```bash
-lafmm stats                      # all data
-lafmm stats --period 2026        # year
-lafmm stats --period 2026-Q1     # quarter
-lafmm stats --period 2026-03     # month
-lafmm stats --period 30d         # last 30 days
-lafmm stats ibkr                 # specific account
-lafmm stats --no-benchmark       # skip SPY comparison
+lafmm stats                          # all data
+lafmm stats --period 2026            # year
+lafmm stats --period 2026-Q1         # quarter
+lafmm stats --period 2026-03         # month
+lafmm stats --period 30d             # last 30 days
+lafmm stats ibkr                     # specific account
+lafmm stats --no-benchmark           # skip SPY comparison
 ```
 
 For raw numbers (JSON):

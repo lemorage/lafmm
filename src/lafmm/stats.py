@@ -53,14 +53,17 @@ def render_stats(data: dict, console: Console | None = None) -> None:
         )
     )
 
-    _render_performance(data, con)
-    _render_capital(data, con)
-    _render_risk(data, con)
-    _render_costs(data, con)
-    _render_behavior(data, con)
-    _render_symbols(data, con)
-    _render_monthly(data, con)
-    con.print()
+    for render in (
+        _render_performance,
+        _render_capital,
+        _render_risk,
+        _render_costs,
+        _render_behavior,
+        _render_symbols,
+        _render_monthly,
+    ):
+        render(data, con)
+        con.print()
 
 
 def _render_performance(data: dict, con: Console) -> None:
@@ -70,6 +73,10 @@ def _render_performance(data: dict, con: Console) -> None:
 
     table.add_row("Total Trades", str(data["total_trades"]))
     table.add_row("Buys / Sells", f"{data['buys']} / {data['sells']}")
+    table.add_row("Limit Orders", str(data["limit_orders"]))
+    table.add_row("Market Orders", str(data["market_orders"]))
+    table.add_row("Stop Orders", str(data["stop_orders"]))
+    table.add_section()
     table.add_row("Wins / Losses", f"{data['wins']} / {data['losses']}")
     table.add_row("Win Rate", _pct_color(data["win_rate"]))
     table.add_row("Total P&L", _pnl_color(data["total_pnl"]))
@@ -132,20 +139,19 @@ def _render_costs(data: dict, con: Console) -> None:
 
 def _render_behavior(data: dict, con: Console) -> None:
     table = Table(title="Behavior", box=box.SIMPLE_HEAVY, show_edge=False)
-    table.add_column("Metric", style="bold")
-    table.add_column("Value", justify="right")
+    table.add_column("Category", style="bold")
+    table.add_column("Trades", justify="right")
+    table.add_column("Win Rate", justify="right")
 
-    table.add_row(
-        "Signal Trades",
-        f"{data['signal_trades']} ({_pct_color(data['signal_win_rate'])} win rate)",
-    )
-    table.add_row(
-        "Impulse Trades",
-        f"{data['impulse_trades']} ({_pct_color(data['impulse_win_rate'])} win rate)",
-    )
-    table.add_row("Limit Orders", str(data["limit_orders"]))
-    table.add_row("Market Orders", str(data["market_orders"]))
-    table.add_row("Stop Orders", str(data["stop_orders"]))
+    pre = data.get("pre_system_trades", 0)
+    if pre > 0:
+        table.add_row("Pre-System", str(pre), _pct_color(data.get("pre_system_win_rate", 0)))
+    sig = data["signal_trades"]
+    if sig > 0:
+        table.add_row("Systematic", str(sig), _pct_color(data["signal_win_rate"]))
+    disc = data["impulse_trades"]
+    if disc > 0:
+        table.add_row("Discretionary", str(disc), _pct_color(data["impulse_win_rate"]))
 
     con.print(table)
 
@@ -192,7 +198,7 @@ def _render_monthly(data: dict, con: Console) -> None:
     con.print(table)
 
 
-def _resolve_account(accounts_dir: Path, name: str | None) -> Path:
+def resolve_account(accounts_dir: Path, name: str | None) -> Path:
     if not accounts_dir.exists():
         click.echo("no accounts found — run lafmm first")
         sys.exit(1)
@@ -218,7 +224,7 @@ def _find_compute_script(lafmm_dir: Path) -> Path:
     return repo / "skills" / "stats" / "scripts" / "compute.py"
 
 
-def _run_compute(
+def run_compute(
     lafmm_dir: Path,
     account_dir: Path,
     period: str | None,

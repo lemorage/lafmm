@@ -9,10 +9,20 @@ Requires Python 3.14+ and [uv](https://docs.astral.sh/uv/).
 ```bash
 git clone https://github.com/lemorage/lafmm.git
 cd lafmm && uv sync
-uv run lafmm
+uv tool install -e .
+lafmm
 ```
 
+Global install puts `lafmm` on PATH, including `~/.lafmm/` where agents operate. Without it, use `uv run lafmm` from the project directory.
+
 First run scaffolds `~/.lafmm/`, fetches US index prices (SPY, QQQ, DIA, IWM), and launches [Claude Code](https://claude.ai/download) (v2.1.59+). Subsequent runs open the interactive TUI.
+
+```bash
+lafmm                          # TUI (default)
+lafmm stats                    # trading performance
+lafmm stats --period 2026-Q1   # filtered by period
+lafmm sync                     # regenerate cache from data
+```
 
 ## The System
 

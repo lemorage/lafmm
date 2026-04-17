@@ -45,21 +45,21 @@ def main(ctx: click.Context) -> None:
 @click.option("--benchmark/--no-benchmark", default=True, help="Compare against SPY")
 def stats(account: str | None, period: str | None, benchmark: bool) -> None:
     """Show trading performance statistics."""
-    from lafmm.stats import _resolve_account, _run_compute, render_stats
+    from lafmm.stats import render_stats, resolve_account, run_compute
 
     root = get_root()
     if root is None:
         click.echo("run 'lafmm' first to set up")
         return
 
-    account_dir = _resolve_account(root / "accounts", account)
+    account_dir = resolve_account(root / "accounts", account)
     journal = account_dir / "journal"
     if not journal.is_dir() or not any(journal.rglob("*.md")):
         click.echo(f"no trade data in {account_dir.name}/")
         click.echo("  use the sync-trades skill to import broker data first")
         return
 
-    data = _run_compute(root, account_dir, period, benchmark)
+    data = run_compute(root, account_dir, period, benchmark)
     render_stats(data)
 
 
@@ -137,3 +137,7 @@ def _launch_claude(root: os.PathLike[str]) -> None:
         click.echo("  claude code not found on PATH.")
         click.echo("  install: https://claude.ai/download")
         click.echo(f"  or use any agent CLI: cd {root}")
+
+
+if __name__ == "__main__":
+    main()

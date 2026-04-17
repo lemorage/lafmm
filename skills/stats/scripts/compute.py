@@ -106,6 +106,7 @@ class Stats:
     pre_system_trades: int = 0
     signal_win_rate: float = 0.0
     impulse_win_rate: float = 0.0
+    pre_system_win_rate: float = 0.0
     limit_orders: int = 0
     market_orders: int = 0
     stop_orders: int = 0
@@ -402,6 +403,11 @@ def _behavior(
         "impulse_win_rate": (
             sum(1 for t in impulse if t.pnl > 0) / len(impulse) * 100 if impulse else 0.0
         ),
+        "pre_system_win_rate": (
+            sum(1 for t in pre_system if t.pnl > 0) / len(pre_system) * 100
+            if pre_system
+            else 0.0
+        ),
         "limit_orders": sum(1 for t in all_trades if t.order == "limit"),
         "market_orders": sum(1 for t in all_trades if t.order == "market"),
         "stop_orders": sum(1 for t in all_trades if t.order == "stop"),
@@ -535,7 +541,8 @@ def _read_tracked_since(account_dir: Path) -> str:
     if not toml_path.exists():
         return ""
     with toml_path.open("rb") as f:
-        return tomllib.load(f).get("tracked_since", "")
+        data = tomllib.load(f)
+    return data.get("tracked_since", "") or data.get("broker", {}).get("tracked_since", "")
 
 
 # ── Main ─────────────────────────────────────────────────────────────
