@@ -34,57 +34,71 @@ Omit it when showing the user their stats.
   "last_date": "2025-06-30",
   "period": "all",
   "market_days": 125,
-  "active_days": 68,
-  "total_trades": 150,
-  "buys": 70,
-  "sells": 80,
-  "wins": 48,
-  "losses": 30,
-  "breakeven": 2,
+  "active_days": 80,
+  "total_trades": 200,
+  "buys": 95,
+  "sells": 105,
+  "wins": 60,
+  "losses": 40,
+  "breakeven": 0,
   "win_rate": 60.0,
-  "total_pnl": 3200.00,
-  "avg_win": 135.50,
-  "avg_loss": -105.00,
+  "total_pnl": 3500.00,
+  "avg_win": 125.00,
+  "avg_loss": -100.00,
   "largest_win": 800.00,
   "largest_loss": -600.00,
-  "expectancy": 40.00,
+  "expectancy": 35.00,
+  "profit_factor": 1.88,
+  "concentration_pct": 35.0,
   "start_capital": 10000.00,
-  "end_capital": 15200.00,
-  "total_deposits": 2000.00,
+  "end_capital": 15000.00,
+  "total_deposits": 1500.00,
   "total_withdrawals": 0.0,
-  "trading_return_pct": 28.5,
+  "total_fees": 80.00,
+  "total_dividends": 30.00,
+  "total_tax": 5.00,
+  "total_interest": -10.00,
+  "total_platform_fees": 0.0,
+  "trading_return_pct": 30.0,
   "max_drawdown_pct": 12.0,
-  "sharpe": 1.55,
-  "signal_trades": 25,
-  "impulse_trades": 10,
-  "pre_system_trades": 45,
-  "signal_win_rate": 68.0,
+  "max_drawdown_days": 20,
+  "longest_win_streak": 8,
+  "longest_loss_streak": 4,
+  "sharpe": 1.50,
+  "fees_pct_of_pnl": 2.3,
+  "signal_trades": 50,
+  "impulse_trades": 30,
+  "pre_system_trades": 20,
+  "signal_win_rate": 65.0,
   "impulse_win_rate": 50.0,
-  "pre_system_win_rate": 57.8,
-  "limit_orders": 120,
-  "market_orders": 20,
-  "stop_orders": 10,
+  "pre_system_win_rate": 55.0,
+  "order_types": {"limit": 150, "market": 30, "stop": 20},
+  "avg_hold_days": 7.5,
+  "longest_hold_days": 30,
+  "longest_hold_symbol": "AAPL",
   "symbols_traded": 12,
   "top_symbols": [{"symbol": "AAPL", "pnl": 1200.00}, ...],
-  "monthly_pnl": [{"month": "2025-01", "pnl": 450.00}, ...],
-  "spy_return_pct": 5.2
+  "monthly_pnl": [{"month": "2025-01", "pnl": 500.00}, ...],
+  "spy_return_pct": 8.5
 }
 ```
 
 Key fields for analysis:
 - `trading_return_pct`: time-weighted return (TWR), matches IBKR
-- `signal_trades` / `impulse_trades` / `pre_system_trades`: systematic vs discretionary vs pre-system breakdown
-- `pre_system_trades`: trades before `tracked_since` in account.toml, no Livermore signals
+- `profit_factor`: gross wins / gross losses. >1.5 is good, >2 is excellent
+- `concentration_pct`: % of absolute P&L from top symbol. >50% is risky
+- `signal_trades` / `impulse_trades` / `pre_system_trades`: systematic vs discretionary vs pre-system
+- `order_types`: dynamic dict — keys are whatever order types appear in trades (limit, market, stop, stop_limit, trail, etc.)
 - `spy_return_pct`: benchmark, null if SPY data unavailable
 
 ## What it computes
 
-**Performance**: total trades, win rate, P&L, avg win/loss, expectancy
+**Performance**: total trades, win rate, P&L, avg win/loss, expectancy, profit factor, order type distribution
 **Capital**: start/end capital, deposits (exact USD via FXRateToBase), TWR
 **Risk**: max drawdown, drawdown duration, win/loss streaks, Sharpe ratio
-**Costs**: trading fees, platform fees, dividends, tax, interest
+**Costs**: trading fees, platform fees, dividends, tax, interest, fees as % of P&L
 **Behavior**: systematic vs discretionary vs pre-system trades with win rates
-**Exposure**: top symbols by P&L, monthly P&L breakdown
+**Exposure**: top symbols by P&L, concentration risk, monthly P&L breakdown
 **Benchmark**: TWR vs SPY over the same period
 
 ## Your role

@@ -1,201 +1,294 @@
-"""Beautiful terminal stats display for LAFMM trading performance."""
+"""Beautiful terminal stats dashboard for LAFMM trading performance."""
 
+from __future__ import annotations
+
+import itertools
 import json
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 import click
-from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from lafmm.chart import horizontal_bars, sparkline, vertical_bars
 
-def _bar(value: float, max_val: float, width: int = 20) -> str:
-    if max_val == 0:
-        return ""
-    filled = int(abs(value) / max_val * width)
-    char = "█"
-    if value >= 0:
-        return f"[green]{char * filled}[/]"
-    return f"[red]{char * filled}[/]"
-
-
-def _pnl_color(value: float) -> str:
-    if value > 0:
-        return f"[green]+${value:,.2f}[/]"
-    if value < 0:
-        return f"[red]-${abs(value):,.2f}[/]"
-    return "$0.00"
-
-
-def _pct_color(value: float) -> str:
-    if value > 0:
-        return f"[green]+{value:.1f}%[/]"
-    if value < 0:
-        return f"[red]{value:.1f}%[/]"
-    return "0.0%"
+MONTH_NAMES = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 
 def render_stats(data: dict, console: Console | None = None) -> None:
     con = console or Console()
-
     con.print()
-    con.print(
-        Panel(
-            f"[bold]{data['first_date']} → {data['last_date']}[/]"
-            f"  ({data['market_days']} market days, {data['active_days']} active)"
-            + (f"  [dim]period: {data['period']}[/]" if data.get("period", "all") != "all" else ""),
-            title="[bold]LAFMM Trading Stats[/]",
-            border_style="blue",
-        )
+    _header(data, con)
+    con.print()
+    con.print(_grid("Performance", _perf_pairs(data)))
+    con.print()
+    con.print(_grid("Risk", _risk_pairs(data)))
+    con.print()
+    _monthly(data, con)
+    con.print()
+    _symbols(data, con)
+    con.print()
+    con.print(_grid("Capital", _capital_pairs(data)))
+    con.print()
+    con.print(_grid("Costs & Income", _costs_pairs(data)))
+    con.print()
+    _behavior(data, con)
+    con.print()
+
+
+# ── Grid panel helper ───────────────────────────────────────────────
+
+
+def _grid(title: str, pairs: Sequence[tuple[str, str]]) -> Panel:
+    t = Table(box=None, show_header=False, expand=True, padding=(0, 1))
+    t.add_column(style="bold", ratio=3)
+    t.add_column(justify="right", ratio=2)
+    t.add_column(min_width=4)
+    t.add_column(style="bold", ratio=3)
+    t.add_column(justify="right", ratio=2)
+
+    for i in range(0, len(pairs), 2):
+        left = pairs[i]
+        right = pairs[i + 1] if i + 1 < len(pairs) else ("", "")
+        t.add_row(left[0], left[1], "", right[0], right[1])
+
+    return Panel(t, title=f"[bold]{title}[/]", border_style="blue", padding=(1, 1))
+
+
+# ── Header with hero metrics ────────────────────────────────────────
+
+
+def _header(data: dict, con: Console) -> None:
+    period = data.get("period", "all")
+    note = f"  [dim]period: {period}[/]" if period != "all" else ""
+
+    months = data.get("monthly_pnl", [])
+    cumulative = list(itertools.accumulate(m["pnl"] for m in months))
+    ret = data["trading_return_pct"]
+    spark = sparkline(cumulative, "green" if ret >= 0 else "red") if cumulative else ""
+
+    t = Table(box=None, show_header=False, expand=True, padding=(0, 2))
+    t.add_column()
+    t.add_column(justify="right", no_wrap=True)
+
+    rc = "green" if ret >= 0 else "red"
+    pnl = data["total_pnl"]
+    pc = "green" if pnl >= 0 else "red"
+    ps = "+" if pnl >= 0 else "-"
+
+    t.add_row(
+        _date_markup(data, note),
+        Text.from_markup(
+            f"Return [bold {rc}]{ret:+.1f}%[/]    P&L [bold {pc}]{ps}${abs(pnl):,.2f}[/]"
+        ),
+    )
+    t.add_row(*_second_row(data, ret, spark))
+
+    con.print(Panel(t, title="[bold]LAFMM Trading Stats[/]", border_style="blue"))
+
+
+def _date_markup(data: dict, note: str) -> Text:
+    return Text.from_markup(
+        f"[bold]{data['first_date']} → {data['last_date']}[/]  ·  "
+        f"{data['market_days']} mkt days, {data['active_days']} active{note}"
     )
 
-    for render in (
-        _render_performance,
-        _render_capital,
-        _render_risk,
-        _render_costs,
-        _render_behavior,
-        _render_symbols,
-        _render_monthly,
-    ):
-        render(data, con)
-        con.print()
 
-
-def _render_performance(data: dict, con: Console) -> None:
-    table = Table(title="Performance", box=box.SIMPLE_HEAVY, show_edge=False)
-    table.add_column("Metric", style="bold")
-    table.add_column("Value", justify="right")
-
-    table.add_row("Total Trades", str(data["total_trades"]))
-    table.add_row("Buys / Sells", f"{data['buys']} / {data['sells']}")
-    table.add_row("Limit Orders", str(data["limit_orders"]))
-    table.add_row("Market Orders", str(data["market_orders"]))
-    table.add_row("Stop Orders", str(data["stop_orders"]))
-    table.add_section()
-    table.add_row("Wins / Losses", f"{data['wins']} / {data['losses']}")
-    table.add_row("Win Rate", _pct_color(data["win_rate"]))
-    table.add_row("Total P&L", _pnl_color(data["total_pnl"]))
-    table.add_row("Avg Win", _pnl_color(data["avg_win"]))
-    table.add_row("Avg Loss", _pnl_color(data["avg_loss"]))
-    table.add_row("Largest Win", _pnl_color(data["largest_win"]))
-    table.add_row("Largest Loss", _pnl_color(data["largest_loss"]))
-    table.add_row("Expectancy", _pnl_color(data["expectancy"]))
-
-    con.print(table)
-
-
-def _render_capital(data: dict, con: Console) -> None:
-    table = Table(title="Capital", box=box.SIMPLE_HEAVY, show_edge=False)
-    table.add_column("Metric", style="bold")
-    table.add_column("Value", justify="right")
-
-    table.add_row("Start", f"${data['start_capital']:,.2f}")
-    table.add_row("End", f"${data['end_capital']:,.2f}")
-    table.add_row("Deposits", f"${data['total_deposits']:,.2f}")
-    table.add_row("Withdrawals", f"${data['total_withdrawals']:,.2f}")
-    table.add_row("Trading Return", _pct_color(data["trading_return_pct"]))
-
-    if data.get("spy_return_pct") is not None:
-        table.add_row("SPY Return", _pct_color(data["spy_return_pct"]))
-        diff = data["trading_return_pct"] - data["spy_return_pct"]
-        table.add_row("vs SPY", _pct_color(diff))
-
-    con.print(table)
-
-
-def _render_risk(data: dict, con: Console) -> None:
-    table = Table(title="Risk", box=box.SIMPLE_HEAVY, show_edge=False)
-    table.add_column("Metric", style="bold")
-    table.add_column("Value", justify="right")
-
-    table.add_row("Max Drawdown", f"[red]{data['max_drawdown_pct']:.1f}%[/]")
-    table.add_row("Drawdown Days", str(data["max_drawdown_days"]))
-    table.add_row("Win Streak", f"[green]{data['longest_win_streak']}[/]")
-    table.add_row("Loss Streak", f"[red]{data['longest_loss_streak']}[/]")
-    table.add_row("Sharpe Ratio", f"{data['sharpe']:.2f}")
-
-    con.print(table)
-
-
-def _render_costs(data: dict, con: Console) -> None:
-    table = Table(title="Costs & Income", box=box.SIMPLE_HEAVY, show_edge=False)
-    table.add_column("Metric", style="bold")
-    table.add_column("Value", justify="right")
-
-    table.add_row("Trading Fees", f"[red]${data['total_fees']:,.2f}[/]")
-    table.add_row("Fees % of P&L", f"{data['fees_pct_of_pnl']:.1f}%")
-    table.add_row("Platform Fees", f"[red]${data.get('total_platform_fees', 0):,.2f}[/]")
-    table.add_row("Dividends", f"[green]${data['total_dividends']:,.2f}[/]")
-    table.add_row("Tax Withheld", f"[red]${data['total_tax']:,.2f}[/]")
-    table.add_row("Net Interest", _pnl_color(data["total_interest"]))
-
-    con.print(table)
-
-
-def _render_behavior(data: dict, con: Console) -> None:
-    table = Table(title="Behavior", box=box.SIMPLE_HEAVY, show_edge=False)
-    table.add_column("Category", style="bold")
-    table.add_column("Trades", justify="right")
-    table.add_column("Win Rate", justify="right")
-
-    pre = data.get("pre_system_trades", 0)
-    if pre > 0:
-        table.add_row("Pre-System", str(pre), _pct_color(data.get("pre_system_win_rate", 0)))
-    sig = data["signal_trades"]
-    if sig > 0:
-        table.add_row("Systematic", str(sig), _pct_color(data["signal_win_rate"]))
-    disc = data["impulse_trades"]
-    if disc > 0:
-        table.add_row("Discretionary", str(disc), _pct_color(data["impulse_win_rate"]))
-
-    con.print(table)
-
-
-def _render_symbols(data: dict, con: Console) -> None:
-    symbols = data.get("top_symbols", [])
-    if not symbols:
-        return
-
-    table = Table(title="Top Symbols by P&L", box=box.SIMPLE_HEAVY, show_edge=False)
-    table.add_column("Symbol", style="bold")
-    table.add_column("P&L", justify="right")
-    table.add_column("", width=22)
-
-    max_abs = max(abs(s["pnl"]) for s in symbols) if symbols else 1.0
-    for s in symbols:
-        table.add_row(
-            s["symbol"],
-            _pnl_color(s["pnl"]),
-            Text.from_markup(_bar(s["pnl"], max_abs)),
+def _second_row(data: dict, ret: float, spark: str) -> tuple[Text, Text]:
+    spy = data.get("spy_return_pct")
+    if spy is not None:
+        diff = ret - spy
+        dc = "green" if diff >= 0 else "red"
+        return (
+            Text.from_markup(f"Equity  {spark}"),
+            Text.from_markup(f"[dim]SPY {spy:+.1f}%[/]    [{dc}]vs benchmark {diff:+.1f}%[/]"),
         )
+    return (Text.from_markup(f"Equity  {spark}"), Text(""))
 
-    con.print(table)
+
+# ── Section data ────────────────────────────────────────────────────
 
 
-def _render_monthly(data: dict, con: Console) -> None:
+def _perf_pairs(data: dict) -> list[tuple[str, str]]:
+    d = data
+    pf = d.get("profit_factor", 0.0)
+    pf_c = "green" if pf >= 1.5 else ("yellow" if pf >= 1.0 else "red")
+
+    pairs: list[tuple[str, str]] = [
+        ("Total Trades", str(d["total_trades"])),
+        ("Wins / Losses", f"{d['wins']} / {d['losses']}"),
+        ("Buys / Sells", f"{d['buys']} / {d['sells']}"),
+        ("Win Rate", _pct(d["win_rate"])),
+    ]
+    for order_type, count in d.get("order_types", {}).items():
+        pairs.append((f"{order_type.title()} Orders", str(count)))
+    pairs.extend(
+        [
+            ("Total P&L", _pnl(d["total_pnl"])),
+            ("Avg Win", _pnl(d["avg_win"])),
+            ("Avg Loss", _pnl(d["avg_loss"])),
+            ("Largest Win", _pnl(d["largest_win"])),
+            ("Largest Loss", _pnl(d["largest_loss"])),
+            ("Expectancy", _pnl(d["expectancy"])),
+            ("Profit Factor", f"[{pf_c}]{pf:.2f}[/]" if pf > 0 else "N/A"),
+        ]
+    )
+    return pairs
+
+
+def _risk_pairs(data: dict) -> list[tuple[str, str]]:
+    d = data
+    return [
+        ("Max Drawdown", f"[red]-{d['max_drawdown_pct']:.1f}%[/]"),
+        ("Drawdown Days", str(d["max_drawdown_days"])),
+        ("Win Streak", f"[green]{d['longest_win_streak']}[/]"),
+        ("Loss Streak", f"[red]{d['longest_loss_streak']}[/]"),
+        ("Sharpe Ratio", f"{d['sharpe']:.2f}"),
+    ]
+
+
+def _capital_pairs(data: dict) -> list[tuple[str, str]]:
+    d = data
+    pairs = [
+        ("Start", f"${d['start_capital']:,.2f}"),
+        ("End", f"${d['end_capital']:,.2f}"),
+        ("Deposits", f"${d['total_deposits']:,.2f}"),
+        ("Withdrawals", f"${d['total_withdrawals']:,.2f}"),
+        ("Trading Return", _pct(d["trading_return_pct"])),
+    ]
+    spy = d.get("spy_return_pct")
+    if spy is not None:
+        pairs.append(("SPY Return", _pct(spy)))
+    return pairs
+
+
+def _costs_pairs(data: dict) -> list[tuple[str, str]]:
+    d = data
+    return [
+        ("Trading Fees", f"[red]${d['total_fees']:,.2f}[/]"),
+        ("Fees % of P&L", f"{d['fees_pct_of_pnl']:.1f}%"),
+        ("Platform Fees", f"[red]${d.get('total_platform_fees', 0):,.2f}[/]"),
+        ("Dividends", f"[green]+${d['total_dividends']:,.2f}[/]"),
+        ("Tax Withheld", f"[red]${d['total_tax']:,.2f}[/]"),
+        ("Net Interest", _pnl(d["total_interest"])),
+    ]
+
+
+# ── Monthly P&L chart ───────────────────────────────────────────────
+
+
+def _monthly(data: dict, con: Console) -> None:
     months = data.get("monthly_pnl", [])
     if not months:
         return
+    labels = [MONTH_NAMES[int(m["month"].split("-")[1]) - 1] for m in months]
+    values = [m["pnl"] for m in months]
 
-    table = Table(title="Monthly P&L", box=box.SIMPLE_HEAVY, show_edge=False)
-    table.add_column("Month", style="bold")
-    table.add_column("P&L", justify="right")
-    table.add_column("", width=22)
+    n = len(months)
+    available = con.width - 16
+    bw = max(2, min(10, (available - n) // n))
+    chart = vertical_bars(labels, values, height=8, bar_width=bw)
 
-    max_abs = max(abs(m["pnl"]) for m in months) if months else 1.0
-    for m in months:
-        table.add_row(
-            m["month"],
-            _pnl_color(m["pnl"]),
-            Text.from_markup(_bar(m["pnl"], max_abs)),
+    con.print(
+        Panel(
+            Text.from_markup(chart),
+            title="[bold]Monthly P&L[/]",
+            border_style="blue",
+            padding=(1, 2),
         )
+    )
 
-    con.print(table)
+
+# ── Top symbols ─────────────────────────────────────────────────────
+
+
+def _symbols(data: dict, con: Console) -> None:
+    symbols = data.get("top_symbols", [])
+    if not symbols:
+        return
+    labels = [s["symbol"] for s in symbols]
+    values = [s["pnl"] for s in symbols]
+    n_traded = data.get("symbols_traded", len(symbols))
+
+    label_w = max(len(s) for s in labels)
+    bar_w = max(20, con.width - label_w - 30)
+    chart = horizontal_bars(labels, values, width=bar_w)
+
+    content = chart
+    conc = data.get("concentration_pct", 0.0)
+    if conc > 0 and symbols:
+        style = "red" if conc > 50 else ("yellow" if conc > 30 else "dim")
+        content += f"\n\n  [{style}]{conc:.0f}% concentration in {symbols[0]['symbol']}[/]"
+
+    con.print(
+        Panel(
+            Text.from_markup(content),
+            title=f"[bold]Top Symbols[/]  [dim]({n_traded} traded)[/]",
+            border_style="blue",
+            padding=(1, 2),
+        )
+    )
+
+
+# ── Behavior ────────────────────────────────────────────────────────
+
+
+def _behavior(data: dict, con: Console) -> None:
+    rows: list[tuple[str, str, str]] = []
+    _maybe_add(rows, "Pre-System", data, "pre_system_trades", "pre_system_win_rate")
+    _maybe_add(rows, "Systematic", data, "signal_trades", "signal_win_rate")
+    _maybe_add(rows, "Discretionary", data, "impulse_trades", "impulse_win_rate")
+    if not rows:
+        return
+
+    t = Table(box=None, show_header=False, expand=True, padding=(0, 1))
+    t.add_column(style="bold", ratio=2)
+    t.add_column(justify="right", ratio=1)
+    t.add_column(justify="right", ratio=1)
+    for label, trades, wr in rows:
+        t.add_row(label, trades, wr)
+
+    con.print(Panel(t, title="[bold]Behavior[/]", border_style="blue", padding=(1, 1)))
+
+
+def _maybe_add(
+    rows: list[tuple[str, str, str]],
+    label: str,
+    data: dict,
+    count_key: str,
+    wr_key: str,
+) -> None:
+    count = data.get(count_key, 0)
+    if count > 0:
+        wr = data.get(wr_key, 0.0)
+        rows.append((label, f"{count} trades", f"{wr:.1f}% win rate"))
+
+
+# ── Formatting helpers ──────────────────────────────────────────────
+
+
+def _pnl(v: float) -> str:
+    if v > 0:
+        return f"[green]+${v:,.2f}[/]"
+    if v < 0:
+        return f"[red]-${abs(v):,.2f}[/]"
+    return "$0.00"
+
+
+def _pct(v: float) -> str:
+    if v > 0:
+        return f"[green]+{v:.1f}%[/]"
+    if v < 0:
+        return f"[red]{v:.1f}%[/]"
+    return "0.0%"
+
+
+# ── Public API ──────────────────────────────────────────
 
 
 def resolve_account(accounts_dir: Path, name: str | None) -> Path:

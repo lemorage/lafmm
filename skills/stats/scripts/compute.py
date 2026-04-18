@@ -23,7 +23,7 @@ import re
 import sys
 import tomllib
 from collections import defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -85,6 +85,8 @@ class Stats:
     largest_win: float = 0.0
     largest_loss: float = 0.0
     expectancy: float = 0.0
+    profit_factor: float = 0.0
+    concentration_pct: float = 0.0
     start_capital: float = 0.0
     end_capital: float = 0.0
     total_deposits: float = 0.0
@@ -107,9 +109,7 @@ class Stats:
     signal_win_rate: float = 0.0
     impulse_win_rate: float = 0.0
     pre_system_win_rate: float = 0.0
-    limit_orders: int = 0
-    market_orders: int = 0
-    stop_orders: int = 0
+    order_types: dict[str, int] = field(default_factory=dict)
     symbols_traded: int = 0
     top_symbols: tuple[SymbolPnl, ...] = ()
     monthly_pnl: tuple[MonthPnl, ...] = ()
@@ -301,6 +301,7 @@ def _performance(all_trades: list[Trade], closes: list[Trade]) -> dict:
         "largest_win": max((t.pnl for t in wins), default=0.0),
         "largest_loss": min((t.pnl for t in losses), default=0.0),
         "expectancy": total_pnl / len(closes) if closes else 0.0,
+        "profit_factor": _profit_factor(wins, losses),
     }
 
 
@@ -406,9 +407,7 @@ def _behavior(
         "pre_system_win_rate": (
             sum(1 for t in pre_system if t.pnl > 0) / len(pre_system) * 100 if pre_system else 0.0
         ),
-        "limit_orders": sum(1 for t in all_trades if t.order == "limit"),
-        "market_orders": sum(1 for t in all_trades if t.order == "market"),
-        "stop_orders": sum(1 for t in all_trades if t.order == "stop"),
+        "order_types": dict(_count_order_types(all_trades)),
     }
 
 
@@ -419,8 +418,13 @@ def _exposure(closes: list[Trade]) -> dict:
         by_symbol[t.symbol] += t.pnl
         by_month[t.date[:7]] += t.pnl
 
+    gross_abs = sum(abs(v) for v in by_symbol.values())
+    top_pnl = max(abs(v) for v in by_symbol.values()) if by_symbol else 0.0
+    concentration = top_pnl / gross_abs * 100 if gross_abs > 0 else 0.0
+
     return {
         "symbols_traded": len(by_symbol),
+        "concentration_pct": round(concentration, 1),
         "top_symbols": tuple(
             SymbolPnl(sym, round(pnl, 2))
             for sym, pnl in sorted(by_symbol.items(), key=lambda x: x[1], reverse=True)[:10]
@@ -430,6 +434,20 @@ def _exposure(closes: list[Trade]) -> dict:
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
+
+
+def _count_order_types(trades: list[Trade]) -> list[tuple[str, int]]:
+    counts: dict[str, int] = defaultdict(int)
+    for t in trades:
+        if t.order and t.order != "—":
+            counts[t.order] += 1
+    return sorted(counts.items(), key=lambda x: x[1], reverse=True)
+
+
+def _profit_factor(wins: list[Trade], losses: list[Trade]) -> float:
+    gross_win = sum(t.pnl for t in wins)
+    gross_loss = abs(sum(t.pnl for t in losses))
+    return round(gross_win / gross_loss, 2) if gross_loss > 0 else 0.0
 
 
 def _extract_usd(line: str) -> float:
