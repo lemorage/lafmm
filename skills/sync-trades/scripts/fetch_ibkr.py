@@ -71,9 +71,18 @@ def _get_with_retry(
     sys.exit(1)
 
 
+_RETRYABLE_CODES = {"1018", "1019", "1021"}
+
+
 def request_report(token: str, query_id: str) -> str:
     resp = _get_with_retry(SEND_URL, {"t": token, "q": query_id, "v": "3"})
     root = ElementTree.fromstring(resp.text)
+
+    code = root.findtext("ErrorCode") or ""
+    if code in _RETRYABLE_CODES:
+        _log(f"rate limited ({code}), waiting 60s...")
+        time.sleep(60)
+        return request_report(token, query_id)
 
     if root.findtext("Status") != "Success":
         _log(f"error: {root.findtext('ErrorMessage') or resp.text}")
@@ -97,14 +106,16 @@ def fetch_report(token: str, ref_code: str, max_polls: int = 20) -> str:
             return resp.text
 
         root = ElementTree.fromstring(resp.text)
+        code = root.findtext("ErrorCode") or ""
         msg = root.findtext("ErrorMessage") or ""
-        if root.findtext("Status") == "Warn" and "try again" in msg.lower():
-            wait = _backoff(poll, base=2.0, cap=30.0)
+
+        if code in _RETRYABLE_CODES or "try again" in msg.lower():
+            wait = _backoff(poll, base=5.0, cap=30.0)
             _log(f"generating... {poll + 1}/{max_polls}, {wait:.1f}s")
             time.sleep(wait)
             continue
 
-        _log(f"error: {msg or resp.text}")
+        _log(f"error ({code}): {msg or resp.text}")
         sys.exit(1)
 
     _log("report not ready after polling")
@@ -120,7 +131,8 @@ def main() -> None:
 
     _log("requesting report...")
     ref_code = request_report(args.token, args.query_id)
-    _log(f"reference: {ref_code}, polling...")
+    _log(f"reference: {ref_code}, waiting for generation...")
+    time.sleep(15)
 
     csv_data = fetch_report(args.token, ref_code)
 

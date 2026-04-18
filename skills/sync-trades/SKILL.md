@@ -56,6 +56,10 @@ query_id = "..."
 The Flex Query uses a 90-day rolling window. Every fetch returns
 recent data. Dedup skips existing entries. Run anytime.
 
+**Rate limits**: IBKR enforces 1 request/sec, 10 requests/min per
+token (error 1018). The fetch script handles this with backoff.
+Activity data updates once daily after close. Fetch once per day.
+
 ## What the scripts produce
 
 Each trading day gets a journal file: `journal/YYYY/MM-DD.md`

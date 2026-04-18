@@ -177,6 +177,18 @@ data. Dedup skips existing entries. No date management needed.
 Cash Transactions become `Deposit:`, `Withdrawal:`, `Dividend:`,
 `Tax:`, `Interest:`, `Fee:` lines. NAV in Base becomes `Capital:`.
 
+## API rate limits
+
+IBKR Flex Web Service enforces per-token limits:
+
+- **1 request/sec**, **10 requests/min** (error 1018 if exceeded)
+- **Error 1019**: statement still generating. Retry after delay.
+- **Error 1021**: statement temporarily unavailable. Retry.
+
+The fetch script waits 15s between SendRequest and GetStatement,
+then polls with exponential backoff (5s base). Activity Statements
+update once daily after market close. Fetch once per day.
+
 ## IBKR-specific behavior
 
 - **Forex rows**: `AssetClass=CASH` (e.g., USD.HKD). Filtered out.
