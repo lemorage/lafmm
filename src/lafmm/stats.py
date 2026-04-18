@@ -37,7 +37,7 @@ def render_stats(data: dict, console: Console | None = None) -> None:
     con.print()
     con.print(_grid("Costs & Income", _costs_pairs(data)))
     con.print()
-    _behavior(data, con)
+    con.print(_grid("Behavior", _behavior_pairs(data)))
     con.print()
 
 
@@ -238,26 +238,25 @@ def _symbols(data: dict, con: Console) -> None:
 # ── Behavior ────────────────────────────────────────────────────────
 
 
-def _behavior(data: dict, con: Console) -> None:
-    rows: list[tuple[str, str, str]] = []
-    _maybe_add(rows, "Pre-System", data, "pre_system_trades", "pre_system_win_rate")
-    _maybe_add(rows, "Systematic", data, "signal_trades", "signal_win_rate")
-    _maybe_add(rows, "Discretionary", data, "impulse_trades", "impulse_win_rate")
-    if not rows:
-        return
+def _behavior_pairs(data: dict) -> list[tuple[str, str]]:
+    d = data
+    pairs: list[tuple[str, str]] = []
+    _maybe_add_category(pairs, "Pre-System", d, "pre_system_trades", "pre_system_win_rate")
+    _maybe_add_category(pairs, "Systematic", d, "signal_trades", "signal_win_rate")
+    _maybe_add_category(pairs, "Discretionary", d, "impulse_trades", "impulse_win_rate")
 
-    t = Table(box=None, show_header=False, expand=True, padding=(0, 1))
-    t.add_column(style="bold", ratio=2)
-    t.add_column(justify="right", ratio=1)
-    t.add_column(justify="right", ratio=1)
-    for label, trades, wr in rows:
-        t.add_row(label, trades, wr)
+    avg_hold = d.get("avg_hold_days", 0.0)
+    longest = d.get("longest_hold_days", 0)
+    if avg_hold > 0 or longest > 0:
+        pairs.append(("Avg Hold", f"{avg_hold:.1f}d"))
+        sym = d.get("longest_hold_symbol", "")
+        pairs.append(("Longest Hold", f"{longest}d {sym}" if sym else f"{longest}d"))
 
-    con.print(Panel(t, title="[bold]Behavior[/]", border_style="blue", padding=(1, 1)))
+    return pairs
 
 
-def _maybe_add(
-    rows: list[tuple[str, str, str]],
+def _maybe_add_category(
+    pairs: list[tuple[str, str]],
     label: str,
     data: dict,
     count_key: str,
@@ -266,7 +265,8 @@ def _maybe_add(
     count = data.get(count_key, 0)
     if count > 0:
         wr = data.get(wr_key, 0.0)
-        rows.append((label, f"{count} trades", f"{wr:.1f}% win rate"))
+        pairs.append((f"{label} Trades", str(count)))
+        pairs.append((f"{label} Win Rate", _pct(wr)))
 
 
 # ── Formatting helpers ──────────────────────────────────────────────

@@ -89,6 +89,7 @@ Key fields for analysis:
 - `concentration_pct`: % of absolute P&L from top symbol. >50% is risky
 - `signal_trades` / `impulse_trades` / `pre_system_trades`: systematic vs discretionary vs pre-system
 - `order_types`: dynamic dict — keys are whatever order types appear in trades (limit, market, stop, stop_limit, trail, etc.)
+- `avg_hold_days` / `longest_hold_days`: position hold duration from open→close reconstruction
 - `spy_return_pct`: benchmark, null if SPY data unavailable
 
 ## What it computes
@@ -97,7 +98,7 @@ Key fields for analysis:
 **Capital**: start/end capital, deposits (exact USD via FXRateToBase), TWR
 **Risk**: max drawdown, drawdown duration, win/loss streaks, Sharpe ratio
 **Costs**: trading fees, platform fees, dividends, tax, interest, fees as % of P&L
-**Behavior**: systematic vs discretionary vs pre-system trades with win rates
+**Behavior**: systematic vs discretionary vs pre-system trades with win rates, hold duration
 **Exposure**: top symbols by P&L, concentration risk, monthly P&L breakdown
 **Benchmark**: TWR vs SPY over the same period
 

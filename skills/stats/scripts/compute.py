@@ -110,6 +110,9 @@ class Stats:
     impulse_win_rate: float = 0.0
     pre_system_win_rate: float = 0.0
     order_types: dict[str, int] = field(default_factory=dict)
+    avg_hold_days: float = 0.0
+    longest_hold_days: int = 0
+    longest_hold_symbol: str = ""
     symbols_traded: int = 0
     top_symbols: tuple[SymbolPnl, ...] = ()
     monthly_pnl: tuple[MonthPnl, ...] = ()
@@ -408,6 +411,7 @@ def _behavior(
             sum(1 for t in pre_system if t.pnl > 0) / len(pre_system) * 100 if pre_system else 0.0
         ),
         "order_types": dict(_count_order_types(all_trades)),
+        **_hold_stats(all_trades),
     }
 
 
@@ -434,6 +438,39 @@ def _exposure(closes: list[Trade]) -> dict:
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
+
+
+def _hold_durations(trades: list[Trade]) -> list[tuple[str, int]]:
+    sorted_trades = sorted(trades, key=lambda t: (t.date, t.time))
+    positions: dict[str, int] = defaultdict(int)
+    open_dates: dict[str, str] = {}
+    holds: list[tuple[str, int]] = []
+
+    for t in sorted_trades:
+        prev = positions[t.symbol]
+        positions[t.symbol] += t.qty if t.side == "buy" else -t.qty
+
+        if prev == 0 and positions[t.symbol] != 0:
+            open_dates[t.symbol] = t.date
+        elif positions[t.symbol] == 0 and t.symbol in open_dates:
+            days = (date.fromisoformat(t.date) - date.fromisoformat(open_dates[t.symbol])).days
+            holds.append((t.symbol, days))
+            del open_dates[t.symbol]
+
+    return holds
+
+
+def _hold_stats(trades: list[Trade]) -> dict:
+    holds = _hold_durations(trades)
+    if not holds:
+        return {"avg_hold_days": 0.0, "longest_hold_days": 0, "longest_hold_symbol": ""}
+    longest = max(holds, key=lambda h: h[1])
+    avg = sum(d for _, d in holds) / len(holds)
+    return {
+        "avg_hold_days": round(avg, 1),
+        "longest_hold_days": longest[1],
+        "longest_hold_symbol": longest[0],
+    }
 
 
 def _count_order_types(trades: list[Trade]) -> list[tuple[str, int]]:
