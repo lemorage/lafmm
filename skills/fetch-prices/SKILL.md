@@ -6,6 +6,7 @@ description: >
   a new group's CSVs, backfill historical data, or when you notice data is
   stale during analysis. Use it proactively before running sync or analysis
   when you see CSVs are missing or outdated.
+  Not for real-time prices (use quote instead).
 ---
 
 # Fetch Prices

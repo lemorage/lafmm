@@ -40,6 +40,7 @@ def scaffold() -> Path:
     (root / "CLAUDE.md").write_text("@AGENT.md\n")
     (root / ".python").write_text(sys.executable)
 
+    _scaffold_config(root)
     _scaffold_profile(root)
     _scaffold_insights(root)
     _scaffold_accounts(root)
@@ -159,9 +160,18 @@ def _update_shipped_skills(root: Path) -> None:
         if not skill.is_dir():
             continue
         target = skills_dst / skill.name
-        if target.exists():
-            shutil.rmtree(target)
-        shutil.copytree(skill, target)
+        target.mkdir(exist_ok=True)
+        _merge_skill(skill, target)
+
+
+def _merge_skill(src: Path, dst: Path) -> None:
+    for item in src.iterdir():
+        target = dst / item.name
+        if item.is_dir():
+            target.mkdir(exist_ok=True)
+            _merge_skill(item, target)
+        else:
+            shutil.copy2(item, target)
 
 
 def _agent_md() -> str:
@@ -207,6 +217,12 @@ PROFILE_MD = """\
 ### Hard Rules
 <!-- PLACEHOLDER: rules you never break, e.g., "never average down" -->
 """
+
+
+def _scaffold_config(root: Path) -> None:
+    config = root / "config.toml"
+    if not config.exists():
+        config.write_text("# Workspace-wide settings.\n# API keys, preferences.\n")
 
 
 def _scaffold_profile(root: Path) -> None:

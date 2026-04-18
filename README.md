@@ -45,6 +45,7 @@ Group trend comes from Key Price, not individual stocks. Market trend = majority
 ├── data/                       # OHLCV price data (TOML + CSV)
 │   └── {group}/{TICKER}/{YEAR}.csv
 ├── cache/                      # computed Livermore state (markdown)
+├── config.toml                 # workspace settings (API keys, preferences)
 ├── profile.md                  # who you are as a trader
 ├── accounts/                   # broker configs + trade journals
 │   └── {name}/                 # one folder per trading account
