@@ -243,7 +243,7 @@ def _behavior_pairs(data: dict) -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
     _maybe_add_category(pairs, "Pre-System", d, "pre_system_trades", "pre_system_win_rate")
     _maybe_add_category(pairs, "Systematic", d, "signal_trades", "signal_win_rate")
-    _maybe_add_category(pairs, "Discretionary", d, "impulse_trades", "impulse_win_rate")
+    _maybe_add_category(pairs, "Discretionary", d, "discretionary_trades", "discretionary_win_rate")
 
     avg_hold = d.get("avg_hold_days", 0.0)
     longest = d.get("longest_hold_days", 0)

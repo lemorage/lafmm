@@ -104,10 +104,10 @@ class Stats:
     sharpe: float = 0.0
     fees_pct_of_pnl: float = 0.0
     signal_trades: int = 0
-    impulse_trades: int = 0
+    discretionary_trades: int = 0
     pre_system_trades: int = 0
     signal_win_rate: float = 0.0
-    impulse_win_rate: float = 0.0
+    discretionary_win_rate: float = 0.0
     pre_system_win_rate: float = 0.0
     order_types: dict[str, int] = field(default_factory=dict)
     avg_hold_days: float = 0.0
@@ -396,16 +396,18 @@ def _behavior(
     post_system = [t for t in closes if t.date >= tracked_since] if tracked_since else closes
     pre_system = [t for t in closes if t.date < tracked_since] if tracked_since else []
     signal = [t for t in post_system if t.signal != "—"]
-    impulse = [t for t in post_system if t.signal == "—"]
+    discretionary = [t for t in post_system if t.signal == "—"]
     return {
         "signal_trades": len(signal),
-        "impulse_trades": len(impulse),
+        "discretionary_trades": len(discretionary),
         "pre_system_trades": len(pre_system),
         "signal_win_rate": (
             sum(1 for t in signal if t.pnl > 0) / len(signal) * 100 if signal else 0.0
         ),
-        "impulse_win_rate": (
-            sum(1 for t in impulse if t.pnl > 0) / len(impulse) * 100 if impulse else 0.0
+        "discretionary_win_rate": (
+            sum(1 for t in discretionary if t.pnl > 0) / len(discretionary) * 100
+            if discretionary
+            else 0.0
         ),
         "pre_system_win_rate": (
             sum(1 for t in pre_system if t.pnl > 0) / len(pre_system) * 100 if pre_system else 0.0

@@ -67,10 +67,10 @@ Omit it when showing the user their stats.
   "sharpe": 1.50,
   "fees_pct_of_pnl": 2.3,
   "signal_trades": 50,
-  "impulse_trades": 30,
+  "discretionary_trades": 30,
   "pre_system_trades": 20,
   "signal_win_rate": 65.0,
-  "impulse_win_rate": 50.0,
+  "discretionary_win_rate": 50.0,
   "pre_system_win_rate": 55.0,
   "order_types": {"limit": 150, "market": 30, "stop": 20},
   "avg_hold_days": 7.5,
@@ -87,7 +87,7 @@ Key fields for analysis:
 - `trading_return_pct`: time-weighted return (TWR), matches IBKR
 - `profit_factor`: gross wins / gross losses. >1.5 is good, >2 is excellent
 - `concentration_pct`: % of absolute P&L from top symbol. >50% is risky
-- `signal_trades` / `impulse_trades` / `pre_system_trades`: systematic vs discretionary vs pre-system
+- `signal_trades` / `discretionary_trades` / `pre_system_trades`: systematic vs discretionary vs pre-system
 - `order_types`: dynamic dict — keys are whatever order types appear in trades (limit, market, stop, stop_limit, trail, etc.)
 - `avg_hold_days` / `longest_hold_days`: position hold duration from open→close reconstruction
 - `spy_return_pct`: benchmark, null if SPY data unavailable
