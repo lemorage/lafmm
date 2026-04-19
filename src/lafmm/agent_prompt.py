@@ -264,9 +264,9 @@ Cash flow lines in journal entries (`Deposit:`, `Withdrawal:`, `Dividend:`, `Tax
 
 ### Pre-system history
 
-Each `account.toml` has a `tracked_since` date: when the user started using LAFMM for this account. Journal entries before this date were backported from broker exports. The trade data in those entries is reliable. The observations, if any, reflect whatever system the user was using at the time, not LAFMM. Do not backfill the `signal` column for entries before `tracked_since`. Do not interpret pre-system observations as references to Livermore signals.
+Each `account.toml` has a `tracked_since` date: when the user started using LAFMM for this account. Journal entries before this date were backported from broker exports. The trade data in those entries is reliable. The observations, if any, reflect whatever system the user was using at the time, not LAFMM. Do not interpret pre-system observations as references to Livermore signals. The `signal` column is `—` for pre-system entries.
 
-Entries after `tracked_since` are fully system-aligned. Signals can be backfilled from `cache/`. Observations reference LAFMM concepts.
+Entries after `tracked_since` are fully system-aligned. The `signal` column is filled automatically during trade import from `cache/`. Observations reference LAFMM concepts.
 
 ### Using the journal
 

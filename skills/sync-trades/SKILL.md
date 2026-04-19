@@ -76,15 +76,17 @@ Interest: +USD 4.23
 
 | time | symbol | side | qty | price | fees | order | pnl | open_close | signal |
 |------|--------|------|-----|-------|------|-------|-----|------------|--------|
-| 09:45 | NVDA | buy | 50 | 148.30 | 0.35 | limit | — | O | — |
-| 14:20 | AAPL | sell | 100 | 212.50 | 0.35 | stop | +320.00 | C | — |
+| 09:45 | NVDA | buy | 50 | 148.30 | 0.35 | limit | — | O | BUY 10(d) |
+| 14:20 | AAPL | sell | 100 | 212.50 | 0.35 | stop | +320.00 | C | SELL 10(b) |
 
 ## Observations
 ```
 
 - **Capital**: total account value (cash + positions) from NAV in Base
 - **Cash flows**: deposits, withdrawals, dividends, tax, interest, fees in original currency
-- **signal**: starts as `—`, backfilled later from `cache/`
+- **signal**: filled automatically from `cache/` during import.
+  For dates after `tracked_since`, the script looks up the most recent
+  signal from D-1's close. `—` if no cache exists or date predates tracking.
 
 ## After import
 
@@ -97,28 +99,22 @@ Report what changed. The parse script outputs JSON:
 Summarize for the user: "Synced 3 trades on 2026-04-10. 46 days
 already up to date."
 
-Then offer: "Want me to backfill signal alignment from cache?"
+If `cache/` does not exist yet, all signals will be `—`. Tell the
+user: "Run sync-lafmm-cache first to enable signal tracking."
 
-## Signal backfill
+## Signal timing
 
-Cross-reference `cache/` signal history with journal trades.
+The signal column records what signal the trader could have been
+acting on. The engine processes closing prices. A signal fires
+after market close on Day N. The trader sees it and acts on
+Day N+1. The parse script handles this automatically: for a
+trade on date D, it finds the most recent signal on or before D-1.
 
-**Timing**: the engine processes closing prices. A signal fires
-AFTER market close on Day N. The trader sees it and acts on
-Day N+1. For a trade on date D, check signals that existed
-after processing D-1's close. The signal column records what
-the trader could have been acting on, not what fired that day.
+Only dates after `tracked_since` from `account.toml` get signals.
+Earlier entries predate LAFMM — their signal stays `—`.
 
-For each trade on date D:
-1. Look up the stock in `cache/`
-2. Check signals that fired on or before D-1
-3. If a signal was active, fill it in
-
-Only backfill entries after `tracked_since` from `account.toml`.
-Entries before that date predate LAFMM — no signals existed.
-
-Enables alignment analysis: how many trades followed a signal
-vs. impulse.
+Post-`tracked_since` signal alignment enables the key question:
+how many trades followed a Livermore signal vs. discretionary.
 
 ## Setup
 

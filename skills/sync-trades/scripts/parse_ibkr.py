@@ -22,13 +22,68 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 import sys
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date, timedelta
 from pathlib import Path
 
 ORDER_MAP: Mapping[str, str] = {"LMT": "limit", "MKT": "market", "STP": "stop"}
+
+_SIGNAL_RE = re.compile(
+    r"^\s*-\s+\*\*(BUY|SELL|DANGER: Up Over|DANGER: Dn Over)\*\*"
+    r"\s+\$[\d.]+\s+Rule\s+(10\([a-f]\))"
+    r"\s+—\s+.+\((\d{4}-\d{2}-\d{2})\)\s*$"
+)
+
+_SIGNAL_SHORT: Mapping[str, str] = {
+    "BUY": "BUY",
+    "SELL": "SELL",
+    "DANGER: Up Over": "DANGER",
+    "DANGER: Dn Over": "DANGER",
+}
+
+type SignalIndex = Mapping[str, Sequence[tuple[str, str]]]
+
+
+def load_signal_index(cache_dir: Path) -> SignalIndex:
+    if not cache_dir.is_dir():
+        return {}
+    index: dict[str, list[tuple[str, str]]] = {}
+    for md in cache_dir.rglob("*.md"):
+        if md.name in ("group.md", "market.md"):
+            continue
+        symbol = md.stem
+        signals: list[tuple[str, str]] = []
+        for line in md.read_text().splitlines():
+            m = _SIGNAL_RE.match(line)
+            if m:
+                label = f"{_SIGNAL_SHORT[m.group(1)]} {m.group(2)}"
+                signals.append((m.group(3), label))
+        if signals:
+            index[symbol] = sorted(signals, key=lambda s: s[0])
+    return index
+
+
+def lookup_signal(index: SignalIndex, symbol: str, trade_date: str) -> str:
+    signals = index.get(symbol, ())
+    if not signals:
+        return "—"
+    d = date(int(trade_date[:4]), int(trade_date[4:6]), int(trade_date[6:8]))
+    cutoff = (d - timedelta(days=1)).isoformat()
+    latest_date = ""
+    hits: list[str] = []
+    for sig_date, label in signals:
+        if sig_date > cutoff:
+            continue
+        if sig_date > latest_date:
+            latest_date = sig_date
+            hits = [label]
+        elif sig_date == latest_date:
+            hits.append(label)
+    return ", ".join(hits) if hits else "—"
 
 JOURNAL_README = """\
 # Journal
@@ -213,11 +268,11 @@ def normalize_cash(raw: Sequence[dict[str, str]]) -> dict[str, list[str]]:
     return dict(by_date)
 
 
-def _format_trade_row(trade: Trade) -> str:
+def _format_trade_row(trade: Trade, signal: str = "—") -> str:
     return (
         f"| {trade.time} | {trade.symbol} | {trade.side} "
         f"| {trade.qty} | {trade.price:.2f} | {trade.fees:.2f} "
-        f"| {trade.order} | {trade.pnl} | {trade.open_close} | — |"
+        f"| {trade.order} | {trade.pnl} | {trade.open_close} | {signal} |"
     )
 
 
@@ -226,6 +281,8 @@ def _format_day(
     day_trades: Sequence[Trade],
     cash_lines: Sequence[str],
     nav_value: float | None,
+    signals: SignalIndex = {},
+    tracked_since: str = "",
 ) -> str:
     year, month, day = date_str[:4], date_str[4:6], date_str[6:8]
     lines = [f"# {year}/{month}-{day}", ""]
@@ -233,6 +290,8 @@ def _format_day(
     lines.append(f"Capital: ${nav_value:,.2f}" if nav_value else "Capital: —")
     lines.extend(cash_lines)
     lines.append("")
+
+    can_fill = tracked_since and date_str >= tracked_since.replace("-", "")
 
     if day_trades:
         lines.append("## Trades")
@@ -243,7 +302,9 @@ def _format_day(
         lines.append(
             "|------|--------|------|-----|-------|------|-------|-----|------------|--------|"
         )
-        lines.extend(_format_trade_row(t) for t in day_trades)
+        for t in day_trades:
+            sig = lookup_signal(signals, t.symbol, t.date) if can_fill else "—"
+            lines.append(_format_trade_row(t, sig))
         lines.append("")
 
     lines.append("## Observations")
@@ -264,6 +325,8 @@ def write_journal(
     trades: Sequence[Trade],
     cash: dict[str, list[str]],
     nav: dict[str, float],
+    signals: SignalIndex = {},
+    tracked_since: str = "",
 ) -> ImportStats:
     _ensure_journal_readme(journal_dir)
 
@@ -289,7 +352,9 @@ def write_journal(
 
         day_trades = trades_by_date.get(date_str, [])
         cash_lines = cash.get(date_str, [])
-        content = _format_day(date_str, day_trades, cash_lines, nav.get(date_str))
+        content = _format_day(
+            date_str, day_trades, cash_lines, nav.get(date_str), signals, tracked_since,
+        )
         file_path.write_text(content)
 
         new_files += 1
@@ -342,6 +407,17 @@ def _nav_date(d: str) -> str:
     return d
 
 
+def _read_tracked_since(account_dir: Path) -> str:
+    toml_path = account_dir / "account.toml"
+    if not toml_path.exists():
+        return ""
+    for line in toml_path.read_text().splitlines():
+        if line.strip().startswith("tracked_since"):
+            val = line.split("=", 1)[1].strip().strip('"').strip("'")
+            return val
+    return ""
+
+
 def main() -> None:
     if len(sys.argv) < 3:
         print("usage: parse_ibkr.py CSV_FILE ACCOUNT_DIR", file=sys.stderr)
@@ -351,12 +427,16 @@ def main() -> None:
     account_dir = Path(sys.argv[2])
     journal_dir = account_dir / "journal"
     capital_dir = account_dir / "capital"
+    cache_dir = account_dir.parent / "cache"
+
+    signals = load_signal_index(cache_dir)
+    tracked_since = _read_tracked_since(account_dir)
 
     csv_text = csv_path.read_text()
     raw_trades, raw_cash, nav = parse_csv(csv_text)
     trades = normalize_trades(raw_trades)
     cash = normalize_cash(raw_cash)
-    stats = write_journal(journal_dir, trades, cash, nav)
+    stats = write_journal(journal_dir, trades, cash, nav, signals, tracked_since)
     capital_rows = write_capital(capital_dir, nav)
 
     forex = len(raw_trades) - len(trades)
