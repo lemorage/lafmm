@@ -41,16 +41,16 @@ same result.
 
 ```bash
 # Append latest prices (auto-discovers ticker dir under ~/.lafmm/data/)
-uv run scripts/fetch.py NVDA
+uv run .claude/skills/fetch-prices/scripts/fetch.py NVDA
 
 # Explicit target (directory or file)
-uv run scripts/fetch.py NVDA --csv ~/.lafmm/data/semis/NVDA
+uv run .claude/skills/fetch-prices/scripts/fetch.py NVDA --csv ~/.lafmm/data/semis/NVDA
 
 # Backfill from a specific date
-uv run scripts/fetch.py NVDA --start 2026-01-02
+uv run .claude/skills/fetch-prices/scripts/fetch.py NVDA --start 2026-01-02
 
 # Last 30 calendar days
-uv run scripts/fetch.py NVDA --days 30
+uv run .claude/skills/fetch-prices/scripts/fetch.py NVDA --days 30
 ```
 
 The script prints each new row as it appends. If the data is already up
@@ -61,7 +61,7 @@ to date, it says so and exits.
 ### Updating one ticker
 
 ```bash
-uv run scripts/fetch.py SPY
+uv run .claude/skills/fetch-prices/scripts/fetch.py SPY
 ```
 
 Auto-discovers `~/.lafmm/data/us-indices/SPY/` and appends to the
@@ -72,10 +72,10 @@ current year's CSV.
 Read `group.toml` for tickers, then fetch each:
 
 ```bash
-uv run scripts/fetch.py SPY
-uv run scripts/fetch.py QQQ
-uv run scripts/fetch.py DIA
-uv run scripts/fetch.py IWM
+uv run .claude/skills/fetch-prices/scripts/fetch.py SPY
+uv run .claude/skills/fetch-prices/scripts/fetch.py QQQ
+uv run .claude/skills/fetch-prices/scripts/fetch.py DIA
+uv run .claude/skills/fetch-prices/scripts/fetch.py IWM
 ```
 
 ### Populating a new group
@@ -83,8 +83,8 @@ uv run scripts/fetch.py IWM
 Backfill with enough history for the engine to establish its state:
 
 ```bash
-uv run scripts/fetch.py NVDA --days 90
-uv run scripts/fetch.py AVGO --days 90
+uv run .claude/skills/fetch-prices/scripts/fetch.py NVDA --days 90
+uv run .claude/skills/fetch-prices/scripts/fetch.py AVGO --days 90
 ```
 
 90 calendar days gives roughly 60 trading days.

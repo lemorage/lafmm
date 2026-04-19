@@ -19,7 +19,7 @@ Get trade data from broker into the journal at
 User provides a CSV file:
 
 ```bash
-uv run scripts/parse_ibkr.py /path/to/LAFMM.csv accounts/{name}/
+uv run .claude/skills/sync-trades/scripts/parse_ibkr.py /path/to/LAFMM.csv accounts/{name}/
 ```
 
 The script parses trades/cash/NAV and writes:
@@ -33,12 +33,12 @@ Existing dates are skipped. Safe to re-run.
 Fetch from IBKR API, then parse:
 
 ```bash
-uv run scripts/fetch_ibkr.py \
+uv run .claude/skills/sync-trades/scripts/fetch_ibkr.py \
   --token "$(toml get accounts/{name}/account.toml broker.api.token)" \
   --query-id "$(toml get accounts/{name}/account.toml broker.api.query_id)" \
   --out /tmp/trades.csv
 
-uv run scripts/parse_ibkr.py /tmp/trades.csv accounts/{name}/
+uv run .claude/skills/sync-trades/scripts/parse_ibkr.py /tmp/trades.csv accounts/{name}/
 ```
 
 Read token and query_id from `accounts/{name}/account.toml`:
