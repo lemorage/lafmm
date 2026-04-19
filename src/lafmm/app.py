@@ -29,12 +29,22 @@ TREND_COLORS: dict[GroupTrend, str] = {
     "neutral": "yellow",
 }
 
-SIGNAL_ICONS: dict[SignalType, tuple[str, str]] = {
-    SignalType.BUY: ("BUY", "green"),
-    SignalType.SELL: ("SELL", "red"),
-    SignalType.DANGER_UP_OVER: ("DANGER", "yellow"),
-    SignalType.DANGER_DOWN_OVER: ("DANGER", "yellow"),
-}
+
+def _signal_text(signal_type: SignalType) -> Text:
+    match signal_type:
+        case SignalType.BUY:
+            return Text("BUY", style="bold green")
+        case SignalType.SELL:
+            return Text("SELL", style="bold red")
+        case SignalType.DANGER_UP_OVER:
+            txt = Text("DANGER ", style="bold yellow")
+            txt.append("▼", style="bold red")
+            return txt
+        case SignalType.DANGER_DOWN_OVER:
+            txt = Text("DANGER ", style="bold yellow")
+            txt.append("▲", style="bold green")
+            return txt
+
 
 CSS = """
 Screen {
@@ -78,10 +88,6 @@ Screen {
     padding: 0 2;
     margin: 0;
 }
-
-.signal-line.buy { color: $success; }
-.signal-line.sell { color: $error; }
-.signal-line.danger { color: $warning; }
 """
 
 
@@ -96,6 +102,22 @@ def _entry_cells(
         format_price(entry.price, col, pivots) if entry is not None and col is entry.col else ""
         for col in COL_ORDER
     ]
+
+
+def _populate_signal_table(
+    table: DataTable,
+    signals: list[tuple[str, Signal]],
+) -> None:
+    table.add_columns("Date", "Ticker", "Signal", "Detail", "Rule")
+    sorted_signals = sorted(signals, key=lambda s: s[1].date, reverse=True)
+    for source, signal in sorted_signals:
+        table.add_row(
+            signal.date,
+            source,
+            _signal_text(signal.signal_type),
+            signal.detail,
+            signal.rule,
+        )
 
 
 def _col_styled(col: Col | None) -> Text:
@@ -283,15 +305,9 @@ class GroupScreen(Screen):
             container.mount(Label("  No signals yet.", classes="signal-line"))
             return
 
-        for source, signal in all_signals:
-            icon, color = SIGNAL_ICONS[signal.signal_type]
-            css_class = "buy" if color == "green" else ("sell" if color == "red" else "danger")
-            container.mount(
-                Label(
-                    f"  {icon} {source} ${signal.price:.2f} Rule {signal.rule} — {signal.detail}",
-                    classes=f"signal-line {css_class}",
-                )
-            )
+        table = DataTable(cursor_type="none", zebra_stripes=True)
+        container.mount(table)
+        _populate_signal_table(table, all_signals)
 
     def _populate_tracked_list(self) -> None:
         table = self.query_one("#tracked-table", DataTable)
@@ -379,15 +395,10 @@ class StockScreen(Screen):
 
     def _populate_signals(self) -> None:
         container = self.query_one("#stock-signals")
-        for signal in self.stock.engine.signals:
-            icon, color = SIGNAL_ICONS[signal.signal_type]
-            css_class = "buy" if color == "green" else ("sell" if color == "red" else "danger")
-            container.mount(
-                Label(
-                    f"  {icon} ${signal.price:.2f} Rule {signal.rule} — {signal.detail}",
-                    classes=f"signal-line {css_class}",
-                )
-            )
+        signals = [(self.stock.ticker, s) for s in self.stock.engine.signals]
+        table = DataTable(cursor_type="none", zebra_stripes=True)
+        container.mount(table)
+        _populate_signal_table(table, signals)
 
     def _populate_pivots(self) -> None:
         table = self.query_one("#pivot-table", DataTable)
