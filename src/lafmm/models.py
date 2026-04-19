@@ -72,10 +72,11 @@ COL_ORDER: Final[tuple[Col, ...]] = (Col.SR, Col.NR, Col.UT, Col.DT, Col.NREAC, 
 
 
 class SignalType(Enum):
-    BUY = auto()  # Rules 10(a), 10(d), 9(a)
-    SELL = auto()  # Rules 10(b), 10(c), 9(c)
+    BUY = auto()  # Rules 10(a), 10(d)
+    SELL = auto()  # Rules 10(b), 10(c)
     DANGER_UP_OVER = auto()  # Rule 10(e)
     DANGER_DOWN_OVER = auto()  # Rule 10(f)
+    WATCH = auto()  # Rules 9(a), 9(b), 9(c)
 
 
 # ── Underline Color ──────────────────────────────────────────────────

@@ -312,6 +312,10 @@ def _check_signals(
     date: str,
     price: float,
 ) -> EngineState:
+    state = _check_9a(state, cfg, date, price)
+    state = _check_9b(state, cfg, date, price)
+    state = _check_9c_ut(state, cfg, date, price)
+    state = _check_9c_nreac(state, cfg, date, price)
     state = _check_10a(state, cfg, date, price)
     state = _check_10c(state, cfg, date, price)
     state = _check_10b(state, cfg, date, price)
@@ -319,6 +323,79 @@ def _check_signals(
     state = _check_10e(state, cfg, date, price)
     state = _check_10f(state, cfg, date, price)
     return state
+
+
+def _check_9a(state: EngineState, cfg: EngineConfig, date: str, price: float) -> EngineState:
+    if state.current in (Col.UT, Col.DT):
+        return state
+    piv = _find_pivot(state, Col.DT, "black")
+    if piv is None or abs(price - piv.price) > cfg.confirm:
+        return state
+    return _emit(
+        state,
+        date,
+        SignalType.WATCH,
+        price,
+        "9(a)",
+        f"approaching DT pivot ${piv.price:.2f} — watch for buy confirmation",
+        pivot_ref=piv,
+    )
+
+
+def _check_9b(state: EngineState, cfg: EngineConfig, date: str, price: float) -> EngineState:
+    if state.current not in (Col.NR, Col.SR):
+        return state
+    piv = _find_pivot(state, Col.NR, "black")
+    if piv is None or abs(price - piv.price) > cfg.confirm:
+        return state
+    return _emit(
+        state,
+        date,
+        SignalType.WATCH,
+        price,
+        "9(b)",
+        f"strength test at NR pivot ${piv.price:.2f} — watch for UT confirmation",
+        pivot_ref=piv,
+    )
+
+
+def _check_9c_ut(state: EngineState, cfg: EngineConfig, date: str, price: float) -> EngineState:
+    if state.current in (Col.UT, Col.DT):
+        return state
+    piv = _find_pivot(state, Col.UT, "red")
+    if piv is None or abs(price - piv.price) > cfg.confirm:
+        return state
+    return _emit(
+        state,
+        date,
+        SignalType.WATCH,
+        price,
+        "9(c)",
+        f"approaching UT pivot ${piv.price:.2f} — watch for sell confirmation",
+        pivot_ref=piv,
+    )
+
+
+def _check_9c_nreac(
+    state: EngineState,
+    cfg: EngineConfig,
+    date: str,
+    price: float,
+) -> EngineState:
+    if state.current not in (Col.NREAC, Col.SREAC):
+        return state
+    piv = _find_pivot(state, Col.NREAC, "red")
+    if piv is None or abs(price - piv.price) > cfg.confirm:
+        return state
+    return _emit(
+        state,
+        date,
+        SignalType.WATCH,
+        price,
+        "9(c)",
+        f"weakness test at NREAC pivot ${piv.price:.2f} — watch for DT confirmation",
+        pivot_ref=piv,
+    )
 
 
 def _check_10a(state: EngineState, cfg: EngineConfig, date: str, price: float) -> EngineState:

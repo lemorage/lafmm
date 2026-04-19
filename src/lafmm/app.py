@@ -44,6 +44,8 @@ def _signal_text(signal_type: SignalType) -> Text:
             txt = Text("DANGER ", style="bold yellow")
             txt.append("▲", style="bold green")
             return txt
+        case SignalType.WATCH:
+            return Text("WATCH", style="bold cyan")
 
 
 CSS = """

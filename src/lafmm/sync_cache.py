@@ -43,6 +43,7 @@ SIGNAL_LABELS: dict[SignalType, str] = {
     SignalType.SELL: "SELL",
     SignalType.DANGER_UP_OVER: "DANGER: Up Over",
     SignalType.DANGER_DOWN_OVER: "DANGER: Dn Over",
+    SignalType.WATCH: "WATCH",
 }
 
 

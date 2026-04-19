@@ -451,9 +451,9 @@ Every rule maps to **exactly one primary code location**. All handlers are pure 
 | **R6(h)**  | `engine._from_nr()`          | Priority 3c sub-branch                          | New state in `SREAC`          |
 | **R7**     | `models.EngineConfig`        | `swing=12, confirm=6` for Key Price             | Config only                   |
 | **R8**     | `engine._mark_pivot()`       | Called by R4(a-d) handlers                       | New state with pivot appended |
-| **R9(a)**  | `engine._check_signals()`    | DT black pivot proximity                        | Potential BUY                 |
-| **R9(b)**  | `engine._check_signals()`    | NR black pivot proximity                        | Strength test                 |
-| **R9(c)**  | `engine._check_signals()`    | Mirror of 9(a)(b) for bearish                   | Potential SELL                |
+| **R9(a)**  | `engine._check_9a()`         | DT black pivot proximity                        | **WATCH signal**              |
+| **R9(b)**  | `engine._check_9b()`         | NR black pivot proximity                        | **WATCH signal**              |
+| **R9(c)**  | `engine._check_9c_ut/nreac()`| Mirror of 9(a)(b) for bearish                   | **WATCH signal**              |
 | **R10(a)** | `engine._check_10a()`        | UT: `price >= pivot + confirm`                  | **BUY signal**                |
 | **R10(b)** | `engine._check_10b()`        | NREAC/DT: `price <= UT_pivot - confirm`         | **SELL signal**               |
 | **R10(c)** | `engine._check_10c()`        | DT: `price <= pivot - confirm`                  | **SELL signal**               |
@@ -472,6 +472,7 @@ src/lafmm/
 ├── engine.py       — Pure FSM functions (depends only on models)
 ├── group.py        — Group/market orchestration (depends on engine + models)
 ├── loader.py       — Filesystem I/O: reads group.toml + CSVs (depends on group + models)
+├── sync_cache.py   — Markdown renderer for agent-readable cache
 ├── app.py          — Interactive Textual TUI (depends on group + models)
 ├── tui.py          — Static Rich renderer for library/scripting use
 └── main.py         — CLI entry point: folder → app

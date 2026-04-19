@@ -33,8 +33,8 @@ from pathlib import Path
 ORDER_MAP: Mapping[str, str] = {"LMT": "limit", "MKT": "market", "STP": "stop"}
 
 _SIGNAL_RE = re.compile(
-    r"^\s*-\s+\*\*(BUY|SELL|DANGER: Up Over|DANGER: Dn Over)\*\*"
-    r"\s+\$[\d.]+\s+Rule\s+(10\([a-f]\))"
+    r"^\s*-\s+\*\*(BUY|SELL|DANGER: Up Over|DANGER: Dn Over|WATCH)\*\*"
+    r"\s+\$[\d.]+\s+Rule\s+((?:9|10)\([a-f]\))"
     r"\s+—\s+.+\((\d{4}-\d{2}-\d{2})\)\s*$"
 )
 
@@ -43,6 +43,7 @@ _SIGNAL_SHORT: Mapping[str, str] = {
     "SELL": "SELL",
     "DANGER: Up Over": "DANGER",
     "DANGER: Dn Over": "DANGER",
+    "WATCH": "WATCH",
 }
 
 type SignalIndex = Mapping[str, Sequence[tuple[str, str]]]
@@ -84,6 +85,7 @@ def lookup_signal(index: SignalIndex, symbol: str, trade_date: str) -> str:
         elif sig_date == latest_date:
             hits.append(label)
     return ", ".join(hits) if hits else "—"
+
 
 JOURNAL_README = """\
 # Journal
@@ -281,7 +283,7 @@ def _format_day(
     day_trades: Sequence[Trade],
     cash_lines: Sequence[str],
     nav_value: float | None,
-    signals: SignalIndex = {},
+    signals: SignalIndex | None = None,
     tracked_since: str = "",
 ) -> str:
     year, month, day = date_str[:4], date_str[4:6], date_str[6:8]
@@ -291,7 +293,9 @@ def _format_day(
     lines.extend(cash_lines)
     lines.append("")
 
-    can_fill = tracked_since and date_str >= tracked_since.replace("-", "")
+    can_fill = (
+        signals is not None and tracked_since != "" and date_str >= tracked_since.replace("-", "")
+    )
 
     if day_trades:
         lines.append("## Trades")
@@ -303,7 +307,9 @@ def _format_day(
             "|------|--------|------|-----|-------|------|-------|-----|------------|--------|"
         )
         for t in day_trades:
-            sig = lookup_signal(signals, t.symbol, t.date) if can_fill else "—"
+            sig = "—"
+            if can_fill and signals is not None:
+                sig = lookup_signal(signals, t.symbol, t.date)
             lines.append(_format_trade_row(t, sig))
         lines.append("")
 
@@ -325,7 +331,7 @@ def write_journal(
     trades: Sequence[Trade],
     cash: dict[str, list[str]],
     nav: dict[str, float],
-    signals: SignalIndex = {},
+    signals: SignalIndex | None = None,
     tracked_since: str = "",
 ) -> ImportStats:
     _ensure_journal_readme(journal_dir)
@@ -353,7 +359,12 @@ def write_journal(
         day_trades = trades_by_date.get(date_str, [])
         cash_lines = cash.get(date_str, [])
         content = _format_day(
-            date_str, day_trades, cash_lines, nav.get(date_str), signals, tracked_since,
+            date_str,
+            day_trades,
+            cash_lines,
+            nav.get(date_str),
+            signals,
+            tracked_since,
         )
         file_path.write_text(content)
 
