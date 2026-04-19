@@ -9,7 +9,8 @@ from lafmm.init import HUMAN_DATA, ensure_structure, get_root, scaffold
 from lafmm.loader import load_market
 
 
-@click.group(invoke_without_command=True)
+@click.group(invoke_without_command=True, context_settings={"help_option_names": ["-h", "--help"]})
+@click.version_option(None, "-V", "--version", package_name="lafmm")
 @click.pass_context
 def main(ctx: click.Context) -> None:
     """Livermore's Anticipating Future Movements Map."""
