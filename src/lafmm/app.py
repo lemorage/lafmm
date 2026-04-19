@@ -104,20 +104,60 @@ def _entry_cells(
     ]
 
 
+_GOLD_START = (238, 207, 115)
+_GOLD_END = (169, 132, 20)
+
+
+def _gold_gradient(text: str, offset: int, total: int) -> Text:
+    result = Text()
+    for i, ch in enumerate(text):
+        t = (offset + i) / max(total - 1, 1)
+        r = int(_GOLD_START[0] + (_GOLD_END[0] - _GOLD_START[0]) * t)
+        g = int(_GOLD_START[1] + (_GOLD_END[1] - _GOLD_START[1]) * t)
+        b = int(_GOLD_START[2] + (_GOLD_END[2] - _GOLD_START[2]) * t)
+        result.append(ch, style=f"rgb({r},{g},{b})")
+    return result
+
+
+def _gold_row(cells: list[str]) -> list[Text]:
+    total = sum(len(c) for c in cells)
+    result: list[Text] = []
+    offset = 0
+    for cell in cells:
+        result.append(_gold_gradient(cell, offset, total))
+        offset += len(cell)
+    return result
+
+
 def _populate_signal_table(
     table: DataTable,
     signals: list[tuple[str, Signal]],
+    dim_key: bool = True,
 ) -> None:
     table.add_columns("Date", "Ticker", "Signal", "Detail", "Rule")
     sorted_signals = sorted(signals, key=lambda s: s[1].date, reverse=True)
     for source, signal in sorted_signals:
-        table.add_row(
-            signal.date,
-            source,
-            _signal_text(signal.signal_type),
-            signal.detail,
-            signal.rule,
-        )
+        is_key = source == "KEY"
+        if is_key and dim_key:
+            gold_cells = [signal.date, source, signal.detail, signal.rule]
+            gold = _gold_row(gold_cells)
+            table.add_row(
+                gold[0],
+                gold[1],
+                _signal_text(signal.signal_type),
+                gold[2],
+                gold[3],
+                key=f"key-{source}-{signal.date}-{signal.rule}",
+            )
+        else:
+            table.add_row(
+                signal.date,
+                source,
+                _signal_text(signal.signal_type),
+                signal.detail,
+                signal.rule,
+                key=f"sig-{source}-{signal.date}-{signal.rule}",
+            )
 
 
 def _col_styled(col: Col | None) -> Text:
@@ -202,11 +242,14 @@ class GroupScreen(Screen):
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("escape", "go_back", "Back", priority=True),
         Binding("enter", "select_tracked", "Open Stock", priority=True),
+        Binding("k", "toggle_key", "Toggle KEY", priority=True),
     ]
 
     def __init__(self, state: GroupState) -> None:
         self.state = state
         self._tracked = group_tracked(state)
+        self._key_visible = True
+        self._all_signals: list[tuple[str, Signal]] = []
         super().__init__()
 
     def compose(self) -> ComposeResult:
@@ -294,20 +337,36 @@ class GroupScreen(Screen):
         kp: StockState | None,
     ) -> None:
         container = self.query_one("#signals-container")
-        all_signals: list[tuple[str, Signal]] = [
+        self._all_signals = [
             *((a.ticker, s) for s in a.engine.signals),
             *((b.ticker, s) for s in b.engine.signals),
         ]
         if kp:
-            all_signals.extend(("KEY", s) for s in kp.engine.signals)
+            self._all_signals.extend(("KEY", s) for s in kp.engine.signals)
 
-        if not all_signals:
+        if not self._all_signals:
             container.mount(Label("  No signals yet.", classes="signal-line"))
             return
 
-        table = DataTable(cursor_type="none", zebra_stripes=True)
+        table = DataTable(id="signal-table", cursor_type="none", zebra_stripes=True)
         container.mount(table)
-        _populate_signal_table(table, all_signals)
+        _populate_signal_table(table, self._all_signals)
+
+    def _rebuild_signal_table(self) -> None:
+        try:
+            table = self.query_one("#signal-table", DataTable)
+        except NoMatches:
+            return
+        table.clear(columns=True)
+        if self._key_visible:
+            _populate_signal_table(table, self._all_signals)
+        else:
+            stock_only = [(s, sig) for s, sig in self._all_signals if s != "KEY"]
+            _populate_signal_table(table, stock_only)
+
+    def action_toggle_key(self) -> None:
+        self._key_visible = not self._key_visible
+        self._rebuild_signal_table()
 
     def _populate_tracked_list(self) -> None:
         table = self.query_one("#tracked-table", DataTable)
