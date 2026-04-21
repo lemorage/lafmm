@@ -70,6 +70,43 @@ def stats(account: str | None, period: str | None, benchmark: bool, as_json: boo
         render_stats(data)
 
 
+# ── Chart subcommand ─────────────────────────────────────────────────
+
+
+@main.command()
+@click.argument("chart_type")
+@click.argument("ticker")
+@click.option("--group", "-g", default=None, help="Group name (auto-resolved if omitted)")
+@click.option("--period", "-p", default="90d", help="30d, 90d, 1y, 2026, 2026-Q1")
+@click.option("--width", "-w", default=80, help="Chart width in columns")
+@click.option("--height", "-H", default=24, help="Chart height in rows")
+@click.option("--title", default=None, help="Override auto-generated title")
+@click.option("--ma", multiple=True, help="Moving averages for overlay (e.g. sma:20 ema:50)")
+@click.option("--fast", default=12, help="MACD fast period")
+@click.option("--slow", default=26, help="MACD slow period")
+@click.option("--signal", default=9, help="MACD signal period")
+@click.option("--rsi-period", default=14, help="RSI period")
+@click.option("--bb-period", default=20, help="Bollinger period")
+@click.option("--bb-width", default=2.0, help="Bollinger band width")
+@click.option("--k", default=14, help="Stochastic %K period")
+@click.option("--d", default=3, help="Stochastic %D period")
+@click.option("--adx-period", default=14, help="ADX period")
+@click.option("--wr-period", default=14, help="Williams %R period")
+@click.option("--cci-period", default=20, help="CCI period")
+@click.option("--vol-period", default=20, help="Volume RVOL period")
+def chart(chart_type: str, ticker: str, **kwargs: object) -> None:
+    """Render terminal charts from OHLCV data."""
+    from lafmm._chart_cmd import ChartOpts, render_chart_cmd
+
+    root = get_root()
+    if root is None:
+        click.echo("run 'lafmm' first to set up")
+        return
+
+    opts = ChartOpts(**kwargs)  # type: ignore[arg-type]  # Click provides typed values
+    render_chart_cmd(root / HUMAN_DATA, chart_type, ticker, opts)
+
+
 # ── Sync subcommand ──────────────────────────────────────────────────
 
 

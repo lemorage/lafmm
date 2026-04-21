@@ -22,6 +22,8 @@ lafmm                          # TUI (default)
 lafmm stats                    # trading performance
 lafmm stats --period 2026-Q1   # filtered by period
 lafmm sync                     # regenerate cache from data
+lafmm chart macd NVDA          # terminal charts (13 types)
+lafmm chart candle SPY -p 30d  # candlestick, last 30 days
 ```
 
 ## The System
