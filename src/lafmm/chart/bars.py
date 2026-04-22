@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from collections.abc import Sequence
 
 BLOCKS = " ▁▂▃▄▅▆▇█"
@@ -36,6 +35,7 @@ def vertical_bars(
     y_w = max(len(_compact(max_p)), len(_compact(-max_n)), 2) + 1
     lines: list[str] = []
 
+    _render_value_labels(lines, values, bar_width + gap, y_w)
     _render_positive_region(lines, values, max_p, pos_h, bar_width, gap, y_w)
     _render_zero_line(lines, len(values), bar_width + gap, y_w)
     _render_negative_region(lines, values, max_n, neg_h, bar_width, gap, y_w)
@@ -59,7 +59,7 @@ def horizontal_bars(
 
     lines: list[str] = []
     for label, value, num in zip(labels, values, val_nums, strict=True):
-        bar_len = max(1, round(math.sqrt(abs(value)) / math.sqrt(max_abs) * width))
+        bar_len = max(1, round(abs(value) / max_abs * width))
         color = "green" if value >= 0 else "red"
         bar = f"[{color}]{'█' * bar_len}[/]"
         pad = " " * (width - bar_len)
@@ -126,6 +126,32 @@ def _render_x_labels(
 ) -> None:
     x_line = "".join(lb.center(col_w) for lb in labels)
     lines.append(f"{' ' * (y_w + 2)}{x_line}")
+
+
+def _render_value_labels(
+    lines: list[str],
+    values: Sequence[float],
+    col_w: int,
+    y_w: int,
+) -> None:
+    bar_w = col_w - 1
+    gap = 1
+    parts: list[str] = []
+    for val in values:
+        color = "green" if val >= 0 else "red"
+        label = _compact_precise(val)
+        parts.append(f"[{color}]{label.center(bar_w)}[/]{' ' * gap}")
+    lines.append(f"{' ' * (y_w + 2)}{''.join(parts)}")
+
+
+def _compact_precise(v: float) -> str:
+    sign = "-" if v < 0 else ""
+    a = abs(v)
+    if a >= 10_000:
+        return f"{sign}${a / 1000:.2f}k"
+    if a >= 1000:
+        return f"{sign}${a / 1000:.2f}k"
+    return f"{sign}${a:,.0f}"
 
 
 def _pos_row(
