@@ -9,7 +9,7 @@ from lafmm.group import (
     process_group,
     process_market,
 )
-from lafmm.loader import load_group, load_market
+from lafmm.loader import load_group, load_group_config, load_market, load_price_series
 from lafmm.models import (
     COL_ORDER,
     Col,
@@ -45,7 +45,9 @@ __all__ = [
     "group_trend",
     "init_group",
     "load_group",
+    "load_group_config",
     "load_market",
+    "load_price_series",
     "market_trend",
     "process",
     "process_group",

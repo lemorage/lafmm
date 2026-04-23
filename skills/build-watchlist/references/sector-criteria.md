@@ -44,11 +44,11 @@ The two leaders should be correlated (they track the same sector) but
 not redundant (they capture different facets of the sector). Ideal: two
 companies in the same sector but different sub-sectors.
 
-When `quant/correlation.py` is available, run `pairwise_correlation` on
-two candidates' return series. Correlation between 0.5-0.85 is ideal —
-high enough to represent the same sector, low enough to capture
-different information. Until then, use the sub-sector test: same sector
-but different end markets = good pair.
+Use `lafmm.quant.correlation.pairwise_correlation` on two candidates'
+return series. Correlation between 0.5-0.85 is ideal — high enough to
+represent the same sector, low enough to capture different information.
+As a quick qualitative check: same sector but different end markets is
+usually a good pair.
 
 Examples of good pairs:
 - **Semis**: NVDA (GPU/AI) + AVGO (networking/broadcom) — same sector,
@@ -105,8 +105,8 @@ leaders beats five poorly chosen ones.
   another dilutes attention.
 - **Redundant with existing groups** — adding a "cloud computing" group
   when you already have "software" is likely redundant. The leaders would
-  overlap or correlate heavily. Use the correlation analysis (future
-  quant skill) to test this.
+  overlap or correlate heavily. Use `pairwise_correlation` from
+  `lafmm.quant.correlation` to test this.
 
 ## Sector catalog
 

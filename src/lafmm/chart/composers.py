@@ -442,8 +442,10 @@ def volume_chart(
                 Pane(
                     series=(
                         HistogramSeries(
-                            ys=tuple(volumes), colors=bar_colors,
-                            dual_color=True, label="Vol",
+                            ys=tuple(volumes),
+                            colors=bar_colors,
+                            dual_color=True,
+                            label="Vol",
                         ),
                     ),
                     y_range=(0.0, cap),
@@ -465,6 +467,5 @@ def volume_chart(
 
 def _volume_colors(closes: Sequence[float]) -> tuple[str, ...]:
     return tuple(
-        "green" if i == 0 or closes[i] >= closes[i - 1] else "red"
-        for i in range(len(closes))
+        "green" if i == 0 or closes[i] >= closes[i - 1] else "red" for i in range(len(closes))
     )

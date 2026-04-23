@@ -1,26 +1,18 @@
 from __future__ import annotations
 
-import csv
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 
+from lafmm.loader import load_price_series
+from lafmm.quant.types import PriceSeries
+
 _MAX_DATE_LABELS = 6
 
 
-@dataclass(frozen=True)
-class OHLCV:
-    dates: tuple[str, ...]
-    opens: tuple[float, ...]
-    highs: tuple[float, ...]
-    lows: tuple[float, ...]
-    closes: tuple[float, ...]
-    volumes: tuple[float, ...]
-
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ChartOpts:
     group: str | None = None
     period: str = "90d"
@@ -43,14 +35,17 @@ class ChartOpts:
 
 
 def render_chart_cmd(
-    data_dir: Path, chart_type: str, ticker: str, opts: ChartOpts,
+    data_dir: Path,
+    chart_type: str,
+    ticker: str,
+    opts: ChartOpts,
 ) -> None:
     ticker_dir = _resolve_ticker(data_dir, ticker, opts.group)
     if ticker_dir is None:
         return
 
-    raw = _load_ohlcv(ticker_dir)
-    if not raw.dates:
+    raw = load_price_series(ticker_dir)
+    if raw is None or not raw.dates:
         print(f"no price data in {ticker_dir}", file=sys.stderr)
         return
 
@@ -71,7 +66,9 @@ def render_chart_cmd(
 
 
 def _resolve_ticker(
-    data_dir: Path, ticker: str, group: str | None,
+    data_dir: Path,
+    ticker: str,
+    group: str | None,
 ) -> Path | None:
     ticker = ticker.upper()
 
@@ -83,9 +80,7 @@ def _resolve_ticker(
         return None
 
     matches = [
-        d / ticker
-        for d in sorted(data_dir.iterdir())
-        if d.is_dir() and (d / ticker).is_dir()
+        d / ticker for d in sorted(data_dir.iterdir()) if d.is_dir() and (d / ticker).is_dir()
     ]
 
     if len(matches) == 1:
@@ -100,41 +95,22 @@ def _resolve_ticker(
     return None
 
 
-# ── OHLCV loading ───────────────────────────────────────────────────
-
-
-def _load_ohlcv(ticker_dir: Path) -> OHLCV:
-    rows: list[tuple[str, float, float, float, float, float]] = []
-    for csv_file in sorted(ticker_dir.glob("*.csv")):
-        with csv_file.open() as f:
-            for row in csv.DictReader(f):
-                rows.append((
-                    row["date"],
-                    float(row["open"]),
-                    float(row["high"]),
-                    float(row["low"]),
-                    float(row["close"]),
-                    float(row["volume"]),
-                ))
-    rows.sort(key=lambda r: r[0])
-    if not rows:
-        return OHLCV((), (), (), (), (), ())
-    dates, opens, highs, lows, closes, volumes = zip(*rows, strict=True)
-    return OHLCV(dates, opens, highs, lows, closes, volumes)
-
-
 # ── Period filtering ────────────────────────────────────────────────
 
 
-def _filter_period(data: OHLCV, period: str) -> OHLCV:
+def _filter_period(data: PriceSeries, period: str) -> PriceSeries:
     start, end = _parse_period(period)
     indices = [i for i, d in enumerate(data.dates) if start <= d <= end]
     if not indices:
-        return OHLCV((), (), (), (), (), ())
+        return PriceSeries((), (), (), (), (), ())
     start, end = indices[0], indices[-1] + 1
-    return OHLCV(
-        data.dates[start:end], data.opens[start:end], data.highs[start:end],
-        data.lows[start:end], data.closes[start:end], data.volumes[start:end],
+    return PriceSeries(
+        data.dates[start:end],
+        data.open[start:end],
+        data.high[start:end],
+        data.low[start:end],
+        data.close[start:end],
+        data.volume[start:end],
     )
 
 
@@ -172,7 +148,10 @@ def _parse_period(period: str) -> tuple[str, str]:
 
 
 def _auto_title(
-    ticker: str, chart_type: str, data: OHLCV, opts: ChartOpts,
+    ticker: str,
+    chart_type: str,
+    data: PriceSeries,
+    opts: ChartOpts,
 ) -> str:
     date_range = f"{data.dates[0]} to {data.dates[-1]}"
     type_label = _type_label(chart_type, opts)
@@ -226,14 +205,25 @@ def _short_date(d: str) -> str:
 
 
 _CHART_TYPES = {
-    "line", "candle", "macd", "rsi", "overlay", "bollinger",
-    "stochastic", "adx", "williams-r", "cci", "obv", "vwap", "volume",
+    "line",
+    "candle",
+    "macd",
+    "rsi",
+    "overlay",
+    "bollinger",
+    "stochastic",
+    "adx",
+    "williams-r",
+    "cci",
+    "obv",
+    "vwap",
+    "volume",
 }
 
 
 def _dispatch(
     chart_type: str,
-    data: OHLCV,
+    data: PriceSeries,
     opts: ChartOpts,
     title: str,
     x_labels: tuple[str, ...],
@@ -255,16 +245,20 @@ def _dispatch(
     )
 
     layout = {"width": opts.width, "height": opts.height, "title": title, "x_labels": x_labels}
-    closes, highs, lows, volumes = data.closes, data.highs, data.lows, data.volumes
+    closes, highs, lows, volumes = data.close, data.high, data.low, data.volume
 
     match chart_type:
         case "line":
             return line_chart(closes, **layout)
         case "candle":
-            return candlestick_chart(data.opens, highs, lows, closes, **layout)
+            return candlestick_chart(data.open, highs, lows, closes, **layout)
         case "macd":
             return macd_chart(
-                closes, fast=opts.fast, slow=opts.slow, signal=opts.signal, **layout,
+                closes,
+                fast=opts.fast,
+                slow=opts.slow,
+                signal=opts.signal,
+                **layout,
             )
         case "rsi":
             return rsi_chart(closes, period=opts.rsi_period, **layout)
@@ -273,11 +267,19 @@ def _dispatch(
             return overlay_chart(closes, overlays=overlays, **layout)
         case "bollinger":
             return bollinger_chart(
-                closes, period=opts.bb_period, band_width=opts.bb_width, **layout,
+                closes,
+                period=opts.bb_period,
+                band_width=opts.bb_width,
+                **layout,
             )
         case "stochastic":
             return stochastic_chart(
-                highs, lows, closes, k_period=opts.k, d_period=opts.d, **layout,
+                highs,
+                lows,
+                closes,
+                k_period=opts.k,
+                d_period=opts.d,
+                **layout,
             )
         case "adx":
             return adx_chart(highs, lows, closes, period=opts.adx_period, **layout)

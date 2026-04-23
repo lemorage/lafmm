@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
-"""Compute ATR-based swing thresholds for a LAFMM group.
-
-Usage:
-    uv run atr.py GROUP_DIR [--period N] [--multiplier X]
-
-Examples:
-    uv run atr.py ~/.lafmm/data/semis
-    uv run atr.py ~/.lafmm/data/us-indices --period 20
-    uv run atr.py ~/.lafmm/data/energy --multiplier 2.0
-
-Reads OHLCV CSVs from the group's leader ticker directories,
-computes ATR for each leader, and suggests swing_pct / confirm_pct
-values for group.toml. Does not modify any files.
+"""ATR-based threshold tuning for LAFMM groups.
 
 SPDX-License-Identifier: GPL-3.0-only
 """
@@ -19,28 +7,21 @@ SPDX-License-Identifier: GPL-3.0-only
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import sys
-import tomllib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+
+from lafmm.loader import load_group_config, load_price_series
+from lafmm.quant.volatility import atr, atr_pct
 
 DEFAULT_PERIOD = 14
 DEFAULT_MULTIPLIER = 1.5
 
 
 @dataclass(frozen=True, slots=True)
-class Bar:
-    date: str
-    high: float
-    low: float
-    close: float
-
-
-@dataclass(frozen=True, slots=True)
-class AtrResult:
+class LeaderResult:
     ticker: str
     atr: float
     atr_pct: float
@@ -48,111 +29,54 @@ class AtrResult:
     bar_count: int
 
 
-def load_bars(ticker_dir: Path) -> Sequence[Bar]:
-    rows: list[Bar] = []
-    for csv_file in sorted(ticker_dir.glob("*.csv")):
-        with csv_file.open() as f:
-            for row in csv.DictReader(f):
-                rows.append(
-                    Bar(
-                        date=row["date"],
-                        high=float(row["high"]),
-                        low=float(row["low"]),
-                        close=float(row["close"]),
-                    )
-                )
-    rows.sort(key=lambda b: b.date)
-    return rows
-
-
-def compute_true_ranges(bars: Sequence[Bar]) -> Sequence[float]:
-    if len(bars) < 2:
-        return []
-    return [
-        max(
-            bars[i].high - bars[i].low,
-            abs(bars[i].high - bars[i - 1].close),
-            abs(bars[i].low - bars[i - 1].close),
-        )
-        for i in range(1, len(bars))
-    ]
-
-
-def compute_atr(bars: Sequence[Bar], period: int) -> AtrResult | None:
-    if not bars:
-        return None
-    ranges = compute_true_ranges(bars)
-    if len(ranges) < period:
-        return None
-    atr = sum(ranges[-period:]) / period
-    last_close = bars[-1].close
-    atr_pct = (atr / last_close) * 100 if last_close > 0 else 0.0
-    return AtrResult(
-        ticker="",
-        atr=round(atr, 2),
-        atr_pct=round(atr_pct, 2),
-        last_close=round(last_close, 2),
-        bar_count=len(bars),
-    )
-
-
-def read_group_config(
-    group_dir: Path,
-) -> tuple[str, tuple[str, str], float, float]:
-    toml_path = group_dir / "group.toml"
-    if not toml_path.exists():
-        print(f"error: {toml_path} not found", file=sys.stderr)
-        sys.exit(1)
-    with toml_path.open("rb") as f:
-        raw = tomllib.load(f)
-    name = raw.get("name", group_dir.name)
-    leaders = (raw["leaders"][0], raw["leaders"][1])
-    swing_pct = float(raw.get("swing_pct", 5.0))
-    confirm_pct = float(raw.get("confirm_pct", 2.5))
-    return name, leaders, swing_pct, confirm_pct
-
-
-def analyze_leader(
+def _analyze_leader(
     group_dir: Path,
     ticker: str,
     period: int,
-) -> AtrResult | None:
+) -> LeaderResult | None:
     ticker_dir = group_dir / ticker
     if not ticker_dir.is_dir():
         ticker_dir = group_dir / ticker.upper()
     if not ticker_dir.is_dir():
         print(f"  {ticker}: no data directory found", file=sys.stderr)
         return None
-    bars = load_bars(ticker_dir)
-    if not bars:
+    series = load_price_series(ticker_dir)
+    if series is None:
         print(f"  {ticker}: no price data", file=sys.stderr)
         return None
-    result = compute_atr(bars, period)
-    if result is None:
-        min_bars = period + 1
-        print(f"  {ticker}: need {min_bars} bars, have {len(bars)}")
+    atr_val = atr(series, period)
+    pct_val = atr_pct(series, period)
+    if atr_val is None or pct_val is None:
+        print(f"  {ticker}: need {period + 1} bars, have {len(series.close)}")
         return None
-    return AtrResult(
+    return LeaderResult(
         ticker=ticker,
-        atr=result.atr,
-        atr_pct=result.atr_pct,
-        last_close=result.last_close,
-        bar_count=result.bar_count,
+        atr=round(atr_val, 2),
+        atr_pct=round(pct_val, 2),
+        last_close=round(series.close[-1], 2),
+        bar_count=len(series.close),
     )
 
 
-def print_leader_line(result: AtrResult, period: int) -> None:
-    print(
-        f"  {result.ticker:<6} ATR({period}): "
-        f"${result.atr:<8} -> {result.atr_pct}% of "
-        f"${result.last_close}  ({result.bar_count} bars)"
-    )
+def _suggest_thresholds(
+    results: Sequence[LeaderResult],
+    multiplier: float,
+) -> tuple[float, float, LeaderResult]:
+    higher = max(results, key=lambda r: r.atr_pct)
+    swing = round(higher.atr_pct * multiplier, 1)
+    return swing, round(swing / 2, 1), higher
 
 
-def print_warnings(
-    current_swing: float,
-    higher: AtrResult,
-) -> None:
+def _print_leader_lines(results: Sequence[LeaderResult], period: int) -> None:
+    for r in results:
+        print(
+            f"  {r.ticker:<6} ATR({period}): "
+            f"${r.atr:<8} -> {r.atr_pct}% of "
+            f"${r.last_close}  ({r.bar_count} bars)"
+        )
+
+
+def _print_warnings(current_swing: float, higher: LeaderResult) -> None:
     ratio = current_swing / higher.atr_pct if higher.atr_pct > 0 else 0
     if ratio < 1.1:
         print(
@@ -167,51 +91,30 @@ def print_warnings(
         print("  Risk of missing real trend changes.")
 
 
-def print_report(
-    group_name: str,
+def _print_report(
+    config_name: str,
     group_dir: Path,
-    leaders: tuple[str, str],
-    results: Sequence[AtrResult],
+    results: Sequence[LeaderResult],
     current_swing: float,
     current_confirm: float,
     period: int,
     multiplier: float,
 ) -> None:
-    print(f"Group: {group_name} ({group_dir})")
-    print(f"Leaders: {leaders[0]}, {leaders[1]}")
+    print(f"Group: {config_name} ({group_dir})")
     print(f"ATR period: {period}")
     print()
-
-    for r in results:
-        print_leader_line(r, period)
+    _print_leader_lines(results, period)
     print()
-
-    higher = max(results, key=lambda r: r.atr_pct)
-    suggested_swing = round(higher.atr_pct * multiplier, 1)
-    suggested_confirm = round(suggested_swing / 2, 1)
-
+    swing, confirm, higher = _suggest_thresholds(results, multiplier)
     print(f"  Current:     swing_pct = {current_swing}   confirm_pct = {current_confirm}")
-    print(f"  Suggested:   swing_pct = {suggested_swing}   confirm_pct = {suggested_confirm}")
+    print(f"  Suggested:   swing_pct = {swing}   confirm_pct = {confirm}")
     print()
     print(f"  Based on: {higher.ticker} ATR% = {higher.atr_pct}% x {multiplier} multiplier")
-
-    print_warnings(current_swing, higher)
-
-
-def suggest_thresholds(
-    results: Sequence[AtrResult],
-    multiplier: float,
-) -> tuple[float, float]:
-    higher = max(results, key=lambda r: r.atr_pct)
-    swing = round(higher.atr_pct * multiplier, 1)
-    return swing, round(swing / 2, 1)
+    _print_warnings(current_swing, higher)
 
 
-def print_json(
-    results: Sequence[AtrResult],
-    multiplier: float,
-) -> None:
-    swing, confirm = suggest_thresholds(results, multiplier)
+def _print_json(results: Sequence[LeaderResult], multiplier: float) -> None:
+    swing, confirm, _ = _suggest_thresholds(results, multiplier)
     output = {
         "swing_pct": swing,
         "confirm_pct": confirm,
@@ -230,59 +133,35 @@ def print_json(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="ATR-based threshold tuning for LAFMM",
-    )
-    parser.add_argument(
-        "group_dir",
-        type=Path,
-        help="path to group directory",
-    )
-    parser.add_argument(
-        "--period",
-        type=int,
-        default=DEFAULT_PERIOD,
-        help=f"ATR period (default: {DEFAULT_PERIOD})",
-    )
-    parser.add_argument(
-        "--multiplier",
-        type=float,
-        default=DEFAULT_MULTIPLIER,
-        help=f"ATR-to-swing multiplier (default: {DEFAULT_MULTIPLIER})",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="output machine-readable JSON",
-    )
+    parser = argparse.ArgumentParser(description="ATR-based threshold tuning for LAFMM")
+    parser.add_argument("group_dir", type=Path, help="path to group directory")
+    parser.add_argument("--period", type=int, default=DEFAULT_PERIOD)
+    parser.add_argument("--multiplier", type=float, default=DEFAULT_MULTIPLIER)
+    parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
     group_dir = args.group_dir.expanduser().resolve()
-    name, leaders, current_swing, current_confirm = read_group_config(group_dir)
+    config = load_group_config(group_dir)
 
-    results: list[AtrResult] = []
-    for ticker in leaders:
-        result = analyze_leader(group_dir, ticker, args.period)
+    results: list[LeaderResult] = []
+    for ticker in config.leaders:
+        result = _analyze_leader(group_dir, ticker, args.period)
         if result is not None:
             results.append(result)
 
     if not results:
-        print(
-            "error: no ATR data for any leader. run fetch-prices first.",
-            file=sys.stderr,
-        )
+        print("error: no ATR data for any leader. run fetch-prices first.", file=sys.stderr)
         sys.exit(1)
 
     if args.json:
-        print_json(results, args.multiplier)
+        _print_json(results, args.multiplier)
     else:
-        print_report(
-            name,
+        _print_report(
+            config.name,
             group_dir,
-            leaders,
             results,
-            current_swing,
-            current_confirm,
+            config.swing_pct,
+            config.confirm_pct,
             args.period,
             args.multiplier,
         )

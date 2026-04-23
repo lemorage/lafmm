@@ -21,8 +21,8 @@ daily volatility, giving us an objective basis for setting these values.
 
 ## The script
 
-`scripts/atr.py` reads a group's OHLCV data, computes ATR for each leader,
-and suggests swing_pct / confirm_pct values. It does not modify any files.
+`scripts/atr.py` computes ATR for each leader in a group and suggests
+swing_pct / confirm_pct values. It does not modify any files.
 
 ```bash
 uv run .claude/skills/tune-thresholds/scripts/atr.py ~/.lafmm/data/semis
