@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+- new: braille canvas chart engine, universal renderer with 13 composers
+- new subcommand: `lafmm chart` with chart skill for agent workspace
+- new skill: daily-update for end-of-day orchestration
+- new: quant layer with volatility (Parkinson, GK, RS, YZ) and correlation modules
+- new: standard technical indicators (SMA, EMA, RSI, MACD, Bollinger, ATR, etc.)
+- TUI: help screen with signal and column legend
+- charts: linear scaling for horizontal bars, value labels on vertical bars
+
 ## 0.3.0
 
 - Rules 9(a-c) WATCH signals: pivot proximity alerts before buy/sell confirmation
