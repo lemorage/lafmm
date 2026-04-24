@@ -119,9 +119,13 @@ def _perf_pairs(data: dict) -> list[tuple[str, str]]:
     pf = d.get("profit_factor", 0.0)
     pf_c = "green" if pf >= 1.5 else ("yellow" if pf >= 1.0 else "red")
 
+    rt = d.get("round_trips", 0)
+    op = d.get("open_positions", 0)
+    rt_label = f"{rt} [dim](+{op} open)[/]" if op > 0 else str(rt)
+
     pairs: list[tuple[str, str]] = [
         ("Executions", str(d["total_trades"])),
-        ("Round Trips", str(d.get("round_trips", 0))),
+        ("Round Trips", rt_label),
         ("Wins / Losses", f"{d['wins']} / {d['losses']}"),
         ("Buys / Sells", f"{d['buys']} / {d['sells']}"),
         ("Win Rate", _pct(d["win_rate"])),

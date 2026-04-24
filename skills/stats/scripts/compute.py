@@ -85,6 +85,7 @@ class Stats:
     buys: int = 0
     sells: int = 0
     round_trips: int = 0
+    open_positions: int = 0
     wins: int = 0
     losses: int = 0
     breakeven: int = 0
@@ -289,7 +290,8 @@ def compute(
         period=period_label,
         market_days=len(capitals) if capitals else len(entries),
         active_days=len(entries),
-        **_performance(all_trades, trips),
+        open_positions=_count_open_positions(all_trades),
+        **_performance(all_trades, closes, trips),
         **capital_data,
         **_risk(capitals, trips, flow_events),
         **_costs(all_trades, closes),
@@ -330,12 +332,24 @@ def _round_trips(trades: Sequence[Trade]) -> list[RoundTrip]:
     return trips
 
 
-def _performance(all_trades: Sequence[Trade], trips: Sequence[RoundTrip]) -> dict:
+def _count_open_positions(trades: Sequence[Trade]) -> int:
+    positions: dict[str, int] = defaultdict(int)
+    for t in sorted(trades, key=lambda t: (t.date, t.time)):
+        positions[t.symbol] += t.qty if t.side == "buy" else -t.qty
+    return sum(1 for qty in positions.values() if qty != 0)
+
+
+def _performance(
+    all_trades: Sequence[Trade],
+    closes: Sequence[Trade],
+    trips: Sequence[RoundTrip],
+) -> dict:
     wins = [r for r in trips if r.pnl > 0]
     losses = [r for r in trips if r.pnl < 0]
-    total_pnl = sum(r.pnl for r in trips)
+    total_pnl = sum(t.pnl for t in closes)
     gross_win = sum(r.pnl for r in wins)
     gross_loss = abs(sum(r.pnl for r in losses))
+    closed_pnl = gross_win - gross_loss
     return {
         "total_trades": len(all_trades),
         "buys": sum(1 for t in all_trades if t.side == "buy"),
@@ -350,7 +364,7 @@ def _performance(all_trades: Sequence[Trade], trips: Sequence[RoundTrip]) -> dic
         "avg_loss": -gross_loss / len(losses) if losses else 0.0,
         "largest_win": max((r.pnl for r in wins), default=0.0),
         "largest_loss": min((r.pnl for r in losses), default=0.0),
-        "expectancy": total_pnl / len(trips) if trips else 0.0,
+        "expectancy": closed_pnl / len(trips) if trips else 0.0,
         "profit_factor": round(gross_win / gross_loss, 2) if gross_loss > 0 else 0.0,
     }
 
@@ -419,14 +433,15 @@ def _risk(
     trips: Sequence[RoundTrip],
     flow_events: Sequence[tuple[str, float]],
 ) -> dict:
-    dd_pct, dd_days = _compute_drawdown(capitals) if len(capitals) >= 2 else (0.0, 0)
+    returns = _flow_adjusted_returns(capitals, flow_events) if len(capitals) >= 2 else []
+    dd_pct, dd_days = _compute_drawdown(returns) if returns else (0.0, 0)
     win_streak, loss_streak = _compute_streaks(trips) if trips else (0, 0)
     return {
         "max_drawdown_pct": dd_pct,
         "max_drawdown_days": dd_days,
         "longest_win_streak": win_streak,
         "longest_loss_streak": loss_streak,
-        "sharpe": _compute_sharpe(capitals, flow_events) if len(capitals) >= 10 else 0.0,
+        "sharpe": _compute_sharpe_from_returns(returns) if len(returns) >= 10 else 0.0,
     }
 
 
@@ -562,19 +577,46 @@ def _compute_twr(
     return round((compound - 1) * 100, 2)
 
 
-def _compute_drawdown(capitals: Sequence[tuple[str, float]]) -> tuple[float, int]:
-    peak = capitals[0][1]
+def _flow_adjusted_returns(
+    capitals: Sequence[tuple[str, float]],
+    flow_events: Sequence[tuple[str, float]],
+) -> list[float]:
+    flows_by_date: dict[str, float] = defaultdict(float)
+    for d, amt in flow_events:
+        flows_by_date[d] += amt
+
+    returns: list[float] = []
+    prev = capitals[0][1]
+    for i in range(1, len(capitals)):
+        if prev <= 0:
+            prev = capitals[i][1]
+            continue
+        cur_date, cur = capitals[i]
+        if cur_date in flows_by_date:
+            prev = cur
+        else:
+            returns.append((cur - prev) / prev)
+            prev = cur
+    return returns
+
+
+def _compute_drawdown(returns: Sequence[float]) -> tuple[float, int]:
+    equity = 1.0
+    peak = 1.0
     max_dd = 0.0
     max_dd_days = 0
     dd_start = 0
-    for i, (_, cap) in enumerate(capitals):
-        if cap > peak:
-            peak = cap
+
+    for i, r in enumerate(returns):
+        equity *= 1 + r
+        if equity > peak:
+            peak = equity
             dd_start = i
-        dd = (peak - cap) / peak * 100 if peak > 0 else 0.0
+        dd = (peak - equity) / peak * 100 if peak > 0 else 0.0
         if dd > max_dd:
             max_dd = dd
             max_dd_days = i - dd_start
+
     return round(max_dd, 2), max_dd_days
 
 
@@ -594,23 +636,7 @@ def _compute_streaks(trips: Sequence[RoundTrip]) -> tuple[int, int]:
     return max_win, max_loss
 
 
-def _compute_sharpe(
-    capitals: Sequence[tuple[str, float]],
-    flow_events: Sequence[tuple[str, float]],
-) -> float:
-    flows_by_date: dict[str, float] = defaultdict(float)
-    for d, amt in flow_events:
-        flows_by_date[d] += amt
-
-    returns: list[float] = []
-    for i in range(1, len(capitals)):
-        prev = capitals[i - 1][1]
-        if prev <= 0:
-            continue
-        cur = capitals[i][1]
-        flow = flows_by_date.get(capitals[i][0], 0.0)
-        returns.append((cur - flow - prev) / prev)
-
+def _compute_sharpe_from_returns(returns: Sequence[float]) -> float:
     if len(returns) < 2:
         return 0.0
     avg = sum(returns) / len(returns)
