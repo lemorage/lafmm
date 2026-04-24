@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 
-from lafmm.quant.types import Returns
+from lafmm.quant.types import Returns, sample_variance
 
 _EPSILON = 1e-12
 
@@ -29,8 +29,8 @@ def _pearson(x: Sequence[float], y: Sequence[float]) -> float | None:
     mean_x = sum(x) / n
     mean_y = sum(y) / n
     cov = sum((x[i] - mean_x) * (y[i] - mean_y) for i in range(n)) / (n - 1)
-    var_x = sum((v - mean_x) ** 2 for v in x) / (n - 1)
-    var_y = sum((v - mean_y) ** 2 for v in y) / (n - 1)
+    var_x = sample_variance(x)
+    var_y = sample_variance(y)
     denom = math.sqrt(var_x) * math.sqrt(var_y)
     if denom < _EPSILON:
         return None

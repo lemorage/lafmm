@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 
-from lafmm.quant.types import PriceSeries, Returns
+from lafmm.quant.types import PriceSeries, Returns, sample_variance
 
 TRADING_DAYS_PER_YEAR = 252
 
@@ -42,6 +42,4 @@ def realized_vol(returns: Returns, period: int = 20) -> float | None:
     vals = returns.values[-period:]
     if len(vals) < period:
         return None
-    mean = sum(vals) / len(vals)
-    variance = sum((v - mean) ** 2 for v in vals) / (len(vals) - 1)
-    return math.sqrt(variance) * math.sqrt(TRADING_DAYS_PER_YEAR)
+    return math.sqrt(sample_variance(vals)) * math.sqrt(TRADING_DAYS_PER_YEAR)
