@@ -38,10 +38,11 @@ Omit it when showing the user their stats.
   "total_trades": 200,
   "buys": 95,
   "sells": 105,
-  "wins": 60,
-  "losses": 40,
+  "round_trips": 45,
+  "wins": 30,
+  "losses": 15,
   "breakeven": 0,
-  "win_rate": 60.0,
+  "win_rate": 66.7,
   "total_pnl": 3500.00,
   "avg_win": 125.00,
   "avg_loss": -100.00,
@@ -84,19 +85,22 @@ Omit it when showing the user their stats.
 ```
 
 Key fields for analysis:
+- `total_trades`: execution count (individual fills). `round_trips`: completed positions (flat→position→flat)
+- `wins`, `losses`, `win_rate`, `expectancy`, `profit_factor`: all computed from round trips, not individual executions
 - `trading_return_pct`: time-weighted return (TWR), matches IBKR
+- `sharpe`: flow-adjusted (deposits/withdrawals subtracted before computing daily returns)
 - `profit_factor`: gross wins / gross losses. >1.5 is good, >2 is excellent
 - `concentration_pct`: % of absolute P&L from top symbol. >50% is risky
-- `signal_trades` / `discretionary_trades` / `pre_system_trades`: systematic vs discretionary vs pre-system
+- `signal_trades` / `discretionary_trades` / `pre_system_trades`: systematic vs discretionary vs pre-system, counted by round trip
 - `order_types`: dynamic dict — keys are whatever order types appear in trades (limit, market, stop, stop_limit, trail, etc.)
 - `avg_hold_days` / `longest_hold_days`: position hold duration from open→close reconstruction
 - `spy_return_pct`: benchmark, null if SPY data unavailable
 
 ## What it computes
 
-**Performance**: total trades, win rate, P&L, avg win/loss, expectancy, profit factor, order type distribution
+**Performance**: executions, round trips, win rate, P&L, avg win/loss, expectancy, profit factor, order type distribution
 **Capital**: start/end capital, deposits (exact USD via FXRateToBase), TWR
-**Risk**: max drawdown, drawdown duration, win/loss streaks, Sharpe ratio
+**Risk**: max drawdown, drawdown duration, win/loss streaks, Sharpe ratio (flow-adjusted)
 **Costs**: trading fees, platform fees, dividends, tax, interest, fees as % of P&L
 **Behavior**: systematic vs discretionary vs pre-system trades with win rates, hold duration
 **Exposure**: top symbols by P&L, concentration risk, monthly P&L breakdown

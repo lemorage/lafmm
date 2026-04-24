@@ -120,7 +120,8 @@ def _perf_pairs(data: dict) -> list[tuple[str, str]]:
     pf_c = "green" if pf >= 1.5 else ("yellow" if pf >= 1.0 else "red")
 
     pairs: list[tuple[str, str]] = [
-        ("Total Trades", str(d["total_trades"])),
+        ("Executions", str(d["total_trades"])),
+        ("Round Trips", str(d.get("round_trips", 0))),
         ("Wins / Losses", f"{d['wins']} / {d['losses']}"),
         ("Buys / Sells", f"{d['buys']} / {d['sells']}"),
         ("Win Rate", _pct(d["win_rate"])),
