@@ -34,6 +34,9 @@ def render_stats(data: dict, console: Console | None = None) -> None:
             title = f"excl. {reason} → {rob['excluded']}" if reason else f"excl. {rob['excluded']}"
             con.print()
             con.print(_grid(f"Robustness ({title})", _robustness_pairs(rob)))
+    if data.get("rolling"):
+        con.print()
+        _render_rolling(data, con)
     con.print()
     _monthly(data, con)
     con.print()
@@ -200,6 +203,62 @@ def _costs_pairs(data: dict) -> list[tuple[str, str]]:
         ("Tax Withheld", f"[red]${d['total_tax']:,.2f}[/]"),
         ("Net Interest", _pnl(d["total_interest"])),
     ]
+
+
+# ── Rolling metrics ─────────────────────────────────────────────────
+
+
+def _rolling_rows(data: dict) -> list[tuple[str, str, str, str]]:
+    rolling = data["rolling"]
+    win_rates = [p["win_rate"] for p in rolling]
+    expectancies = [p["expectancy"] for p in rolling]
+    profit_factors = [p["profit_factor"] for p in rolling]
+
+    avg_win_rate = data.get("win_rate", 0.0)
+    avg_expectancy = data.get("expectancy", 0.0)
+    avg_profit_factor = data.get("profit_factor", 0.0)
+    expectancy_color = "green" if expectancies[-1] >= 0 else "red"
+    profit_factor_color = _pf_color(profit_factors[-1])
+
+    return [
+        (
+            "Win Rate",
+            sparkline(win_rates, "cyan"),
+            f"[cyan]{win_rates[-1]:.0f}%[/]",
+            f"avg {avg_win_rate:.0f}%",
+        ),
+        (
+            "Expectancy",
+            sparkline(expectancies, expectancy_color),
+            f"[{expectancy_color}]${expectancies[-1]:,.0f}[/]",
+            f"avg ${avg_expectancy:,.0f}",
+        ),
+        (
+            "Profit Factor",
+            sparkline(profit_factors, "magenta"),
+            f"[{profit_factor_color}]{profit_factors[-1]:.2f}[/]",
+            f"avg {avg_profit_factor:.2f}",
+        ),
+    ]
+
+
+def _render_rolling(data: dict, con: Console) -> None:
+    window = data["rolling"][0]["window"]
+    t = Table(box=None, show_header=False, expand=True, padding=(0, 1))
+    t.add_column(style="bold", no_wrap=True)
+    t.add_column(ratio=1)
+    t.add_column(justify="right", no_wrap=True)
+    t.add_column(justify="right", no_wrap=True, style="dim")
+    for row in _rolling_rows(data):
+        t.add_row(*row)
+    con.print(
+        Panel(
+            t,
+            title=f"[bold]Rolling {window}-Trip Metrics[/]",
+            border_style="blue",
+            padding=(1, 2),
+        )
+    )
 
 
 # ── Monthly P&L chart ───────────────────────────────────────────────

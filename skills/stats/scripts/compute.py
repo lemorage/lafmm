@@ -75,6 +75,15 @@ class MonthPnl:
 
 
 @dataclass(frozen=True, slots=True)
+class RollingPoint:
+    window: int
+    trip_number: int
+    win_rate: float
+    expectancy: float
+    profit_factor: float
+
+
+@dataclass(frozen=True, slots=True)
 class Robustness:
     excluded: str = ""
     reason: str = ""
@@ -139,6 +148,7 @@ class Stats:
     symbols_traded: int = 0
     top_symbols: tuple[SymbolPnl, ...] = ()
     monthly_pnl: tuple[MonthPnl, ...] = ()
+    rolling: tuple[RollingPoint, ...] = ()
     robustness: tuple[Robustness, ...] = ()
     spy_return_pct: float | None = None
 
@@ -311,6 +321,7 @@ def compute(
         **_costs(all_trades, closes),
         **_behavior(all_trades, trips, tracked_since),
         **_exposure(closes),
+        rolling=_rolling(trips),
         robustness=_robustness(trips, grouped),
         spy_return_pct=_benchmark(benchmark_dir, first, last) if benchmark_dir else None,
     )
@@ -518,6 +529,28 @@ def _exposure(closes: list[Trade]) -> dict:
         ),
         "monthly_pnl": tuple(MonthPnl(m, round(p, 2)) for m, p in sorted(by_month.items())),
     }
+
+
+def _rolling(trips: Sequence[RoundTrip], window: int = 10) -> tuple[RollingPoint, ...]:
+    if len(trips) < window:
+        return ()
+    points: list[RollingPoint] = []
+    for i in range(window, len(trips) + 1):
+        batch = trips[i - window : i]
+        wins = [r for r in batch if r.pnl > 0]
+        losses = [r for r in batch if r.pnl < 0]
+        gross_win = sum(r.pnl for r in wins)
+        gross_loss = abs(sum(r.pnl for r in losses))
+        points.append(
+            RollingPoint(
+                window=window,
+                trip_number=i,
+                win_rate=round(len(wins) / window * 100, 1),
+                expectancy=round((gross_win - gross_loss) / window, 2),
+                profit_factor=round(gross_win / gross_loss, 2) if gross_loss > 0 else 0.0,
+            )
+        )
+    return tuple(points)
 
 
 def _group_by_symbol(

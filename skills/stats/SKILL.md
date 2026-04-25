@@ -39,6 +39,7 @@ Omit it when showing the user their stats.
   "buys": 95,
   "sells": 105,
   "round_trips": 45,
+  "open_positions": 1,
   "wins": 30,
   "losses": 15,
   "breakeven": 0,
@@ -80,13 +81,20 @@ Omit it when showing the user their stats.
   "symbols_traded": 12,
   "top_symbols": [{"symbol": "AAPL", "pnl": 1200.00}, ...],
   "monthly_pnl": [{"month": "2025-01", "pnl": 500.00}, ...],
+  "rolling": [{"window": 10, "trip_number": 10, "win_rate": 70.0, "expectancy": 50.00, "profit_factor": 1.80}, ...],
+  "robustness": [
+    {"excluded": "AAPL", "reason": "best", "round_trips": 40, "wins": 25, "losses": 15, "win_rate": 62.5, "expectancy": 20.00, "profit_factor": 1.30},
+    {"excluded": "TSLA", "reason": "worst", "round_trips": 43, "wins": 30, "losses": 13, "win_rate": 69.8, "expectancy": 45.00, "profit_factor": 2.10}
+  ],
   "spy_return_pct": 8.5
 }
 ```
 
 Key fields for analysis:
-- `total_trades`: execution count (individual fills). `round_trips`: completed positions (flat→position→flat)
+- `total_trades`: execution count (individual fills). `round_trips`: completed positions (flat→position→flat). `open_positions`: positions not yet flat
 - `wins`, `losses`, `win_rate`, `expectancy`, `profit_factor`: all computed from round trips, not individual executions
+- `rolling`: sliding window metrics over round trips (default window=10). shows edge stability over time
+- `robustness`: leave-one-out analysis. excludes best/worst PnL symbols and recomputes metrics. `reason` is "best" or "worst"
 - `trading_return_pct`: time-weighted return (TWR), matches IBKR
 - `sharpe`: flow-adjusted (deposits/withdrawals subtracted before computing daily returns)
 - `profit_factor`: gross wins / gross losses. >1.5 is good, >2 is excellent
@@ -104,6 +112,8 @@ Key fields for analysis:
 **Costs**: trading fees, platform fees, dividends, tax, interest, fees as % of P&L
 **Behavior**: systematic vs discretionary vs pre-system trades with win rates, hold duration
 **Exposure**: top symbols by P&L, concentration risk, monthly P&L breakdown
+**Robustness**: leave-one-out analysis excluding best and worst performing symbols
+**Rolling**: sliding window win rate, expectancy, profit factor over round trips
 **Benchmark**: TWR vs SPY over the same period
 
 ## Your role
