@@ -61,19 +61,18 @@ def fetch_bars(ticker: str, start: date, end: date) -> Sequence[Bar]:
         with contextlib.suppress(IndexError, ValueError):
             data.columns = data.columns.droplevel(1)
 
-    bars: list[Bar] = []
-    for idx, row in data.iterrows():
-        o, h, lo, c, v = (float(x) for x in row.values[:5])
-        bars.append(
-            Bar(
-                date=str(idx)[:10],
-                open=round(o, 2),
-                high=round(h, 2),
-                low=round(lo, 2),
-                close=round(c, 2),
-                volume=int(v),
-            )
+    ohlcv = data[["Open", "High", "Low", "Close", "Volume"]]
+    bars: list[Bar] = [
+        Bar(
+            date=str(ohlcv.index[i])[:10],
+            open=round(float(ohlcv.iat[i, 0]), 2),
+            high=round(float(ohlcv.iat[i, 1]), 2),
+            low=round(float(ohlcv.iat[i, 2]), 2),
+            close=round(float(ohlcv.iat[i, 3]), 2),
+            volume=int(ohlcv.iat[i, 4]),
         )
+        for i in range(len(ohlcv))
+    ]
     return bars
 
 
