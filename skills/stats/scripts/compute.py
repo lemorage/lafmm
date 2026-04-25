@@ -23,7 +23,7 @@ import re
 import sys
 import tomllib
 from collections import defaultdict
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
@@ -72,6 +72,18 @@ class SymbolPnl:
 class MonthPnl:
     month: str
     pnl: float
+
+
+@dataclass(frozen=True, slots=True)
+class Robustness:
+    excluded: str = ""
+    reason: str = ""
+    round_trips: int = 0
+    wins: int = 0
+    losses: int = 0
+    win_rate: float = 0.0
+    expectancy: float = 0.0
+    profit_factor: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,6 +139,7 @@ class Stats:
     symbols_traded: int = 0
     top_symbols: tuple[SymbolPnl, ...] = ()
     monthly_pnl: tuple[MonthPnl, ...] = ()
+    robustness: tuple[Robustness, ...] = ()
     spy_return_pct: float | None = None
 
 
@@ -277,6 +290,7 @@ def compute(
     all_trades = [t for e in entries for t in e.trades]
     closes = [t for t in all_trades if t.open_close == "C" and t.pnl != 0.0]
     trips = _round_trips(all_trades)
+    grouped = _group_by_symbol(trips)
     capitals = [(d, c) for d, c in capitals if c > 0] or capitals
 
     first = capitals[0][0] if capitals else entries[0].date
@@ -297,6 +311,7 @@ def compute(
         **_costs(all_trades, closes),
         **_behavior(all_trades, trips, tracked_since),
         **_exposure(closes),
+        robustness=_robustness(trips, grouped),
         spy_return_pct=_benchmark(benchmark_dir, first, last) if benchmark_dir else None,
     )
 
@@ -503,6 +518,62 @@ def _exposure(closes: list[Trade]) -> dict:
         ),
         "monthly_pnl": tuple(MonthPnl(m, round(p, 2)) for m, p in sorted(by_month.items())),
     }
+
+
+def _group_by_symbol(
+    trips: Sequence[RoundTrip],
+) -> dict[str, list[RoundTrip]]:
+    trips_by_symbol: dict[str, list[RoundTrip]] = defaultdict(list)
+    for r in trips:
+        trips_by_symbol[r.symbol].append(r)
+    return dict(trips_by_symbol)
+
+
+def _metrics_from_trips(
+    trips: Sequence[RoundTrip],
+    excluded: str,
+    reason: str,
+) -> Robustness:
+    remaining = [r for r in trips if r.symbol != excluded]
+    if not remaining:
+        return Robustness(excluded=excluded, reason=reason)
+    wins = [r for r in remaining if r.pnl > 0]
+    losses = [r for r in remaining if r.pnl < 0]
+    gross_win = sum(r.pnl for r in wins)
+    gross_loss = abs(sum(r.pnl for r in losses))
+    return Robustness(
+        excluded=excluded,
+        reason=reason,
+        round_trips=len(remaining),
+        wins=len(wins),
+        losses=len(losses),
+        win_rate=len(wins) / len(remaining) * 100,
+        expectancy=(gross_win - gross_loss) / len(remaining),
+        profit_factor=round(gross_win / gross_loss, 2) if gross_loss > 0 else 0.0,
+    )
+
+
+def _robustness(
+    trips: Sequence[RoundTrip],
+    trips_by_symbol: Mapping[str, Sequence[RoundTrip]],
+    n_best: int = 1,
+    n_worst: int = 1,
+) -> tuple[Robustness, ...]:
+    if len(trips_by_symbol) < 2:
+        return ()
+    symbols_by_pnl = sorted(
+        trips_by_symbol,
+        key=lambda s: sum(r.pnl for r in trips_by_symbol[s]),
+    )
+    already_excluded: set[str] = set()
+    results: list[Robustness] = []
+    for sym in reversed(symbols_by_pnl[-n_best:]):
+        results.append(_metrics_from_trips(trips, sym, "best"))
+        already_excluded.add(sym)
+    for sym in symbols_by_pnl[:n_worst]:
+        if sym not in already_excluded:
+            results.append(_metrics_from_trips(trips, sym, "worst"))
+    return tuple(results)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────

@@ -28,6 +28,12 @@ def render_stats(data: dict, console: Console | None = None) -> None:
     con.print(_grid("Performance", _perf_pairs(data)))
     con.print()
     con.print(_grid("Risk", _risk_pairs(data)))
+    for rob in data.get("robustness", []):
+        if rob.get("round_trips", 0) > 0:
+            reason = rob.get("reason", "")
+            title = f"excl. {reason} → {rob['excluded']}" if reason else f"excl. {rob['excluded']}"
+            con.print()
+            con.print(_grid(f"Robustness ({title})", _robustness_pairs(rob)))
     con.print()
     _monthly(data, con)
     con.print()
@@ -117,7 +123,7 @@ def _second_row(data: dict, ret: float, spark: str) -> tuple[Text, Text]:
 def _perf_pairs(data: dict) -> list[tuple[str, str]]:
     d = data
     pf = d.get("profit_factor", 0.0)
-    pf_c = "green" if pf >= 1.5 else ("yellow" if pf >= 1.0 else "red")
+    pf_c = _pf_color(pf)
 
     rt = d.get("round_trips", 0)
     op = d.get("open_positions", 0)
@@ -154,6 +160,18 @@ def _risk_pairs(data: dict) -> list[tuple[str, str]]:
         ("Win Streak", f"[green]{d['longest_win_streak']}[/]"),
         ("Loss Streak", f"[red]{d['longest_loss_streak']}[/]"),
         ("Sharpe Ratio", f"{d['sharpe']:.2f}"),
+    ]
+
+
+def _robustness_pairs(rob: dict) -> list[tuple[str, str]]:
+    pf = rob.get("profit_factor", 0.0)
+    pf_c = _pf_color(pf)
+    return [
+        ("Round Trips", str(rob["round_trips"])),
+        ("Wins / Losses", f"{rob['wins']} / {rob['losses']}"),
+        ("Win Rate", _pct(rob["win_rate"])),
+        ("Expectancy", _pnl(rob["expectancy"])),
+        ("Profit Factor", f"[{pf_c}]{pf:.2f}[/]" if pf > 0 else "N/A"),
     ]
 
 
@@ -275,6 +293,12 @@ def _maybe_add_category(
 
 
 # ── Formatting helpers ──────────────────────────────────────────────
+
+
+def _pf_color(profit_factor: float) -> str:
+    if profit_factor >= 1.5:
+        return "green"
+    return "yellow" if profit_factor >= 1.0 else "red"
 
 
 def _pnl(v: float) -> str:
