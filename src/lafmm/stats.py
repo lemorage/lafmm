@@ -10,12 +10,12 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import click
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from lafmm.chart import horizontal_bars, sparkline, vertical_bars
+from lafmm.chart import sparkline, vertical_bars
 
 MONTH_NAMES = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
@@ -293,23 +293,40 @@ def _symbols(data: dict, con: Console) -> None:
     symbols = data.get("top_symbols", [])
     if not symbols:
         return
-    labels = [s["symbol"] for s in symbols]
-    values = [s["pnl"] for s in symbols]
     n_traded = data.get("symbols_traded", len(symbols))
 
-    label_w = max(len(s) for s in labels)
-    bar_w = max(20, con.width - label_w - 30)
-    chart = horizontal_bars(labels, values, width=bar_w)
+    t = Table(box=None, show_header=True, expand=True, padding=(0, 1))
+    t.add_column("Symbol", style="bold", no_wrap=True)
+    t.add_column("P&L", justify="right", no_wrap=True)
+    t.add_column("Trips", justify="right", no_wrap=True)
+    t.add_column("W/L", justify="right", no_wrap=True)
+    t.add_column("Win Rate", justify="right", no_wrap=True)
 
-    content = chart
+    for s in symbols:
+        trip_count = s.get("round_trips", 0)
+        win_count = s.get("wins", 0)
+        loss_count = s.get("losses", 0)
+        win_rate = s.get("win_rate", 0.0)
+        win_rate_color = "green" if win_rate >= 60 else ("yellow" if win_rate >= 50 else "red")
+        t.add_row(
+            s["symbol"],
+            _pnl(s["pnl"]),
+            str(trip_count) if trip_count else "—",
+            f"{win_count}/{loss_count}" if trip_count else "—",
+            f"[{win_rate_color}]{win_rate:.0f}%[/]" if trip_count else "—",
+        )
+
     conc = data.get("concentration_pct", 0.0)
+    footer = ""
     if conc > 0 and symbols:
         style = "red" if conc > 50 else ("yellow" if conc > 30 else "dim")
-        content += f"\n\n  [{style}]{conc:.0f}% concentration in {symbols[0]['symbol']}[/]"
+        footer = f"\n  [{style}]{conc:.0f}% concentration in {symbols[0]['symbol']}[/]"
+
+    content = Group(t, Text.from_markup(footer)) if footer else t
 
     con.print(
         Panel(
-            Text.from_markup(content),
+            content,
             title=f"[bold]Top Symbols[/]  [dim]({n_traded} traded)[/]",
             border_style="blue",
             padding=(1, 2),

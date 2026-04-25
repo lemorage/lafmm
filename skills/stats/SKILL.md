@@ -79,7 +79,7 @@ Omit it when showing the user their stats.
   "longest_hold_days": 30,
   "longest_hold_symbol": "AAPL",
   "symbols_traded": 12,
-  "top_symbols": [{"symbol": "AAPL", "pnl": 1200.00}, ...],
+  "top_symbols": [{"symbol": "AAPL", "pnl": 1200.00, "round_trips": 8, "wins": 6, "losses": 2, "win_rate": 75.0}, ...],
   "monthly_pnl": [{"month": "2025-01", "pnl": 500.00}, ...],
   "rolling": [{"window": 10, "trip_number": 10, "win_rate": 70.0, "expectancy": 50.00, "profit_factor": 1.80}, ...],
   "robustness": [

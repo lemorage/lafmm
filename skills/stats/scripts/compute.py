@@ -63,9 +63,13 @@ class RoundTrip:
 
 
 @dataclass(frozen=True, slots=True)
-class SymbolPnl:
+class SymbolStats:
     symbol: str
     pnl: float
+    round_trips: int = 0
+    wins: int = 0
+    losses: int = 0
+    win_rate: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,7 +150,7 @@ class Stats:
     longest_hold_days: int = 0
     longest_hold_symbol: str = ""
     symbols_traded: int = 0
-    top_symbols: tuple[SymbolPnl, ...] = ()
+    top_symbols: tuple[SymbolStats, ...] = ()
     monthly_pnl: tuple[MonthPnl, ...] = ()
     rolling: tuple[RollingPoint, ...] = ()
     robustness: tuple[Robustness, ...] = ()
@@ -320,7 +324,7 @@ def compute(
         **_risk(capitals, trips, flow_events),
         **_costs(all_trades, closes),
         **_behavior(all_trades, trips, tracked_since),
-        **_exposure(closes),
+        **_exposure(closes, grouped),
         rolling=_rolling(trips),
         robustness=_robustness(trips, grouped),
         spy_return_pct=_benchmark(benchmark_dir, first, last) if benchmark_dir else None,
@@ -509,7 +513,10 @@ def _behavior(
     }
 
 
-def _exposure(closes: list[Trade]) -> dict:
+def _exposure(
+    closes: Sequence[Trade],
+    grouped: Mapping[str, Sequence[RoundTrip]],
+) -> dict:
     by_symbol: dict[str, float] = defaultdict(float)
     by_month: dict[str, float] = defaultdict(float)
     for t in closes:
@@ -520,13 +527,27 @@ def _exposure(closes: list[Trade]) -> dict:
     top_pnl = max(abs(v) for v in by_symbol.values()) if by_symbol else 0.0
     concentration = top_pnl / gross_abs * 100 if gross_abs > 0 else 0.0
 
+    top: list[SymbolStats] = []
+    for symbol, pnl in sorted(by_symbol.items(), key=lambda x: x[1], reverse=True)[:10]:
+        symbol_trips = grouped.get(symbol, [])
+        trip_count = len(symbol_trips)
+        win_count = sum(1 for r in symbol_trips if r.pnl > 0)
+        loss_count = sum(1 for r in symbol_trips if r.pnl < 0)
+        top.append(
+            SymbolStats(
+                symbol=symbol,
+                pnl=round(pnl, 2),
+                round_trips=trip_count,
+                wins=win_count,
+                losses=loss_count,
+                win_rate=round(win_count / trip_count * 100, 1) if trip_count else 0.0,
+            )
+        )
+
     return {
         "symbols_traded": len(by_symbol),
         "concentration_pct": round(concentration, 1),
-        "top_symbols": tuple(
-            SymbolPnl(sym, round(pnl, 2))
-            for sym, pnl in sorted(by_symbol.items(), key=lambda x: x[1], reverse=True)[:10]
-        ),
+        "top_symbols": tuple(top),
         "monthly_pnl": tuple(MonthPnl(m, round(p, 2)) for m, p in sorted(by_month.items())),
     }
 
