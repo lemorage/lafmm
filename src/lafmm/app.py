@@ -274,7 +274,7 @@ class GroupScreen(Screen):
                 f" {a.ticker} + {b.ticker} — Livermore Map",
                 classes="section-label",
             )
-            yield DataTable(id="map-table", cursor_type="row", zebra_stripes=True)
+            yield DataTable(id="map-table", cursor_type="row", zebra_stripes=True, fixed_columns=1)
 
             yield Label(" Signals", classes="section-label")
             yield Vertical(id="signals-container")
