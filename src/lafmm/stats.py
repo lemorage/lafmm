@@ -46,7 +46,7 @@ def render_stats(data: dict, console: Console | None = None) -> None:
     con.print()
     con.print(_grid("Costs & Income", _costs_pairs(data)))
     con.print()
-    con.print(_grid("Behavior", _behavior_pairs(data)))
+    _behavior(data, con)
     con.print()
 
 
@@ -337,35 +337,54 @@ def _symbols(data: dict, con: Console) -> None:
 # ── Behavior ────────────────────────────────────────────────────────
 
 
-def _behavior_pairs(data: dict) -> list[tuple[str, str]]:
+def _behavior_row(
+    t: Table,
+    label: str,
+    count: int,
+    win_rate: float,
+    indent: bool = False,
+) -> None:
+    prefix = "  " if indent else ""
+    t.add_row(f"{prefix}{label}", str(count), _pct(win_rate))
+
+
+def _behavior(data: dict, con: Console) -> None:
     d = data
-    pairs: list[tuple[str, str]] = []
-    _maybe_add_category(pairs, "Pre-System", d, "pre_system_trades", "pre_system_win_rate")
-    _maybe_add_category(pairs, "Systematic", d, "signal_trades", "signal_win_rate")
-    _maybe_add_category(pairs, "Discretionary", d, "discretionary_trades", "discretionary_win_rate")
+    total = d.get("round_trips", 0)
+    t = Table(box=None, show_header=False, expand=True, padding=(0, 1))
+    t.add_column(style="bold", no_wrap=True, ratio=3)
+    t.add_column(justify="right", ratio=1)
+    t.add_column(justify="right", ratio=2)
+
+    t.add_row("Total Positions", str(total), _pct(d.get("win_rate", 0.0)))
+    t.add_row()
+
+    pre = d.get("pre_system_trades", 0)
+    if pre > 0:
+        _behavior_row(t, "Pre-System", pre, d.get("pre_system_win_rate", 0.0))
+
+    post = d.get("post_system_trades", 0)
+    if post > 0:
+        _behavior_row(t, "Post-System", post, d.get("post_system_win_rate", 0.0))
+        signal_count = d.get("signal_trades", 0)
+        discretionary_count = d.get("discretionary_trades", 0)
+        if signal_count > 0:
+            _behavior_row(t, "Signaled", signal_count, d.get("signal_win_rate", 0.0), indent=True)
+        if discretionary_count > 0:
+            discretionary_win_rate = d.get("discretionary_win_rate", 0.0)
+            _behavior_row(
+                t, "Discretionary", discretionary_count, discretionary_win_rate, indent=True
+            )
 
     avg_hold = d.get("avg_hold_days", 0.0)
     longest = d.get("longest_hold_days", 0)
     if avg_hold > 0 or longest > 0:
-        pairs.append(("Avg Hold", f"{avg_hold:.1f}d"))
+        t.add_row()
         sym = d.get("longest_hold_symbol", "")
-        pairs.append(("Longest Hold", f"{longest}d {sym}" if sym else f"{longest}d"))
+        t.add_row("Avg Hold", f"{avg_hold:.1f}d", "")
+        t.add_row("Longest Hold", f"{longest}d {sym}" if sym else f"{longest}d", "")
 
-    return pairs
-
-
-def _maybe_add_category(
-    pairs: list[tuple[str, str]],
-    label: str,
-    data: dict,
-    count_key: str,
-    wr_key: str,
-) -> None:
-    count = data.get(count_key, 0)
-    if count > 0:
-        wr = data.get(wr_key, 0.0)
-        pairs.append((f"{label} Trades", str(count)))
-        pairs.append((f"{label} Win Rate", _pct(wr)))
+    con.print(Panel(t, title="[bold]Behavior[/]", border_style="blue", padding=(1, 1)))
 
 
 # ── Formatting helpers ──────────────────────────────────────────────

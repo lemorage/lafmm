@@ -68,12 +68,14 @@ Omit it when showing the user their stats.
   "longest_loss_streak": 4,
   "sharpe": 1.50,
   "fees_pct_of_pnl": 2.3,
-  "signal_trades": 50,
-  "discretionary_trades": 30,
   "pre_system_trades": 20,
-  "signal_win_rate": 65.0,
-  "discretionary_win_rate": 50.0,
   "pre_system_win_rate": 55.0,
+  "post_system_trades": 80,
+  "post_system_win_rate": 62.0,
+  "signal_trades": 50,
+  "signal_win_rate": 65.0,
+  "discretionary_trades": 30,
+  "discretionary_win_rate": 50.0,
   "order_types": {"limit": 150, "market": 30, "stop": 20},
   "avg_hold_days": 7.5,
   "longest_hold_days": 30,
@@ -99,7 +101,8 @@ Key fields for analysis:
 - `sharpe`: flow-adjusted (deposits/withdrawals subtracted before computing daily returns)
 - `profit_factor`: gross wins / gross losses. >1.5 is good, >2 is excellent
 - `concentration_pct`: % of absolute P&L from top symbol. >50% is risky
-- `signal_trades` / `discretionary_trades` / `pre_system_trades`: systematic vs discretionary vs pre-system, counted by round trip
+- `pre_system_trades` + `post_system_trades` = total round trips. pre-system = before `tracked_since`, post-system = after
+- `signal_trades` + `discretionary_trades` = post-system. signaled = opened on a system signal, discretionary = opened without one
 - `order_types`: dynamic dict — keys are whatever order types appear in trades (limit, market, stop, stop_limit, trail, etc.)
 - `avg_hold_days` / `longest_hold_days`: position hold duration from open→close reconstruction
 - `spy_return_pct`: benchmark, null if SPY data unavailable
@@ -110,7 +113,7 @@ Key fields for analysis:
 **Capital**: start/end capital, deposits (exact USD via FXRateToBase), TWR
 **Risk**: max drawdown, drawdown duration, win/loss streaks, Sharpe ratio (flow-adjusted)
 **Costs**: trading fees, platform fees, dividends, tax, interest, fees as % of P&L
-**Behavior**: systematic vs discretionary vs pre-system trades with win rates, hold duration
+**Behavior**: pre-system vs post-system split, post-system further split into signaled vs discretionary, hold duration
 **Exposure**: top symbols by P&L, concentration risk, monthly P&L breakdown
 **Robustness**: leave-one-out analysis excluding best and worst performing symbols
 **Rolling**: sliding window win rate, expectancy, profit factor over round trips

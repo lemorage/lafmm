@@ -148,12 +148,14 @@ class Stats:
     longest_loss_streak: int = 0
     sharpe: float = 0.0
     fees_pct_of_pnl: float = 0.0
-    signal_trades: int = 0
-    discretionary_trades: int = 0
     pre_system_trades: int = 0
-    signal_win_rate: float = 0.0
-    discretionary_win_rate: float = 0.0
     pre_system_win_rate: float = 0.0
+    post_system_trades: int = 0
+    post_system_win_rate: float = 0.0
+    signal_trades: int = 0
+    signal_win_rate: float = 0.0
+    discretionary_trades: int = 0
+    discretionary_win_rate: float = 0.0
     order_types: dict[str, int] = field(default_factory=dict)
     avg_hold_days: float = 0.0
     longest_hold_days: int = 0
@@ -598,12 +600,14 @@ def _behavior(
         hold_stats = {"avg_hold_days": 0.0, "longest_hold_days": 0, "longest_hold_symbol": ""}
 
     return {
-        "signal_trades": len(signal),
-        "discretionary_trades": len(discretionary),
         "pre_system_trades": len(pre_system),
-        "signal_win_rate": _category_win_rate(signal),
-        "discretionary_win_rate": _category_win_rate(discretionary),
         "pre_system_win_rate": _category_win_rate(pre_system),
+        "post_system_trades": len(post_system),
+        "post_system_win_rate": _category_win_rate(post_system),
+        "signal_trades": len(signal),
+        "signal_win_rate": _category_win_rate(signal),
+        "discretionary_trades": len(discretionary),
+        "discretionary_win_rate": _category_win_rate(discretionary),
         "order_types": dict(_count_order_types(all_trades)),
         **hold_stats,
     }
