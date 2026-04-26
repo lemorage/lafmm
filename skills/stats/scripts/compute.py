@@ -23,8 +23,8 @@ import re
 import sys
 import tomllib
 from collections import defaultdict
-from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import asdict, dataclass, field
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -55,11 +55,20 @@ class DayEntry:
 
 
 @dataclass(frozen=True, slots=True)
-class RoundTrip:
+class Position:
     symbol: str
-    pnl: float
-    signal: str
+    side: str
+    open_date: str
     close_date: str
+    opens: tuple[Trade, ...]
+    closes: tuple[Trade, ...]
+    pnl: float
+    fees: float
+    signal: str
+    peak_qty: int
+    entry_price: float
+    exit_price: float
+    hold_days: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -288,6 +297,122 @@ def _parse_trades(d: str, text: str) -> list[Trade]:
     return trades
 
 
+# ── Position building ───────────────────────────────────────────────
+
+
+def _weighted_price(trades: Sequence[Trade]) -> float:
+    total_qty = sum(t.qty for t in trades)
+    if total_qty == 0:
+        return 0.0
+    return sum(t.price * t.qty for t in trades) / total_qty
+
+
+def _emit_position(
+    symbol: str,
+    trades: Sequence[Trade],
+    open_date: str,
+    close_date: str,
+    peak_qty: int,
+) -> Position:
+    opens = tuple(t for t in trades if t.open_close == "O")
+    closes = tuple(t for t in trades if t.open_close == "C")
+    first_open = opens[0] if opens else (closes[0] if closes else trades[0])
+    return Position(
+        symbol=symbol,
+        side="long" if first_open.side == "buy" else "short",
+        open_date=open_date,
+        close_date=close_date,
+        opens=opens,
+        closes=closes,
+        pnl=sum(c.pnl for c in closes),
+        fees=sum(t.fees for t in trades),
+        signal=opens[0].signal if opens else "—",
+        peak_qty=peak_qty,
+        entry_price=_weighted_price(opens) if opens else 0.0,
+        exit_price=_weighted_price(closes) if closes else 0.0,
+        hold_days=(date.fromisoformat(close_date) - date.fromisoformat(open_date)).days,
+    )
+
+
+def build_positions(
+    trades: Sequence[Trade],
+) -> tuple[tuple[Position, ...], int]:
+    sorted_trades = sorted(trades, key=lambda t: (t.date, t.time))
+    qty: dict[str, int] = defaultdict(int)
+    open_dates: dict[str, str] = {}
+    accumulated: dict[str, list[Trade]] = defaultdict(list)
+    peak: dict[str, int] = defaultdict(int)
+    positions: list[Position] = []
+
+    for trade in sorted_trades:
+        if trade.qty == 0:
+            continue
+        symbol = trade.symbol
+        old_qty = qty[symbol]
+        delta = trade.qty if trade.side == "buy" else -trade.qty
+        new_qty = old_qty + delta
+
+        if old_qty == 0:
+            open_dates[symbol] = trade.date
+            accumulated[symbol] = [trade]
+            peak[symbol] = abs(new_qty)
+            qty[symbol] = new_qty
+            continue
+
+        same_sign = (old_qty > 0 and new_qty > 0) or (old_qty < 0 and new_qty < 0)
+
+        if same_sign:
+            accumulated[symbol].append(trade)
+            peak[symbol] = max(peak[symbol], abs(new_qty))
+            qty[symbol] = new_qty
+            continue
+
+        if new_qty == 0:
+            accumulated[symbol].append(trade)
+            positions.append(
+                _emit_position(
+                    symbol, accumulated[symbol], open_dates[symbol], trade.date, peak[symbol]
+                )
+            )
+            del open_dates[symbol]
+            del accumulated[symbol]
+            del peak[symbol]
+            qty[symbol] = 0
+            continue
+
+        # sign crossing (flip): split trade into close + open portions
+        close_qty = abs(old_qty)
+        open_qty = abs(new_qty)
+        ratio = close_qty / trade.qty
+        close_part = replace(
+            trade,
+            qty=close_qty,
+            open_close="C",
+            pnl=round(trade.pnl * ratio, 2) if trade.pnl else 0.0,
+            fees=round(trade.fees * ratio, 2),
+        )
+        open_part = replace(
+            trade,
+            qty=open_qty,
+            open_close="O",
+            pnl=0.0,
+            fees=round(trade.fees * (1 - ratio), 2),
+        )
+        accumulated[symbol].append(close_part)
+        positions.append(
+            _emit_position(
+                symbol, accumulated[symbol], open_dates[symbol], trade.date, peak[symbol]
+            )
+        )
+        open_dates[symbol] = trade.date
+        accumulated[symbol] = [open_part]
+        peak[symbol] = open_qty
+        qty[symbol] = new_qty
+
+    open_count = sum(1 for q in qty.values() if q != 0)
+    return tuple(positions), open_count
+
+
 # ── Computation ──────────────────────────────────────────────────────
 
 
@@ -302,9 +427,7 @@ def compute(
         return Stats()
 
     all_trades = [t for e in entries for t in e.trades]
-    closes = [t for t in all_trades if t.open_close == "C" and t.pnl != 0.0]
-    trips = _round_trips(all_trades)
-    grouped = _group_by_symbol(trips)
+    positions, open_count = build_positions(all_trades)
     capitals = [(d, c) for d, c in capitals if c > 0] or capitals
 
     first = capitals[0][0] if capitals else entries[0].date
@@ -318,83 +441,43 @@ def compute(
         period=period_label,
         market_days=len(capitals) if capitals else len(entries),
         active_days=len(entries),
-        open_positions=_count_open_positions(all_trades),
-        **_performance(all_trades, closes, trips),
+        open_positions=open_count,
+        **_performance(all_trades, positions),
         **capital_data,
-        **_risk(capitals, trips, flow_events),
-        **_costs(all_trades, closes),
-        **_behavior(all_trades, trips, tracked_since),
-        **_exposure(closes, grouped),
-        rolling=_rolling(trips),
-        robustness=_robustness(trips, grouped),
+        **_risk(capitals, positions, flow_events),
+        **_costs(all_trades, positions),
+        **_behavior(all_trades, positions, tracked_since),
+        **_exposure(positions),
+        rolling=_rolling(positions),
+        robustness=_robustness(positions),
         spy_return_pct=_benchmark(benchmark_dir, first, last) if benchmark_dir else None,
     )
 
 
-def _walk_positions(
-    trades: Sequence[Trade],
-) -> Iterator[tuple[str, str, str, Sequence[Trade]]]:
-    sorted_trades = sorted(trades, key=lambda t: (t.date, t.time))
-    positions: dict[str, int] = defaultdict(int)
-    open_dates: dict[str, str] = {}
-    open_trades: dict[str, list[Trade]] = defaultdict(list)
-
-    for t in sorted_trades:
-        prev = positions[t.symbol]
-        positions[t.symbol] += t.qty if t.side == "buy" else -t.qty
-
-        if prev == 0 and positions[t.symbol] != 0:
-            open_dates[t.symbol] = t.date
-        if t.open_close == "C":
-            open_trades[t.symbol].append(t)
-
-        if positions[t.symbol] == 0 and t.symbol in open_dates:
-            yield t.symbol, open_dates[t.symbol], t.date, open_trades.pop(t.symbol, [])
-            del open_dates[t.symbol]
-
-
-def _round_trips(trades: Sequence[Trade]) -> list[RoundTrip]:
-    trips: list[RoundTrip] = []
-    for symbol, _, close_date, closes in _walk_positions(trades):
-        pnl = sum(c.pnl for c in closes)
-        signal = closes[0].signal if closes else "—"
-        trips.append(RoundTrip(symbol=symbol, pnl=pnl, signal=signal, close_date=close_date))
-    return trips
-
-
-def _count_open_positions(trades: Sequence[Trade]) -> int:
-    positions: dict[str, int] = defaultdict(int)
-    for t in sorted(trades, key=lambda t: (t.date, t.time)):
-        positions[t.symbol] += t.qty if t.side == "buy" else -t.qty
-    return sum(1 for qty in positions.values() if qty != 0)
-
-
 def _performance(
     all_trades: Sequence[Trade],
-    closes: Sequence[Trade],
-    trips: Sequence[RoundTrip],
+    positions: Sequence[Position],
 ) -> dict:
-    wins = [r for r in trips if r.pnl > 0]
-    losses = [r for r in trips if r.pnl < 0]
-    total_pnl = sum(t.pnl for t in closes)
-    gross_win = sum(r.pnl for r in wins)
-    gross_loss = abs(sum(r.pnl for r in losses))
-    closed_pnl = gross_win - gross_loss
+    wins = [p for p in positions if p.pnl > 0]
+    losses = [p for p in positions if p.pnl < 0]
+    total_pnl = sum(p.pnl for p in positions)
+    gross_win = sum(p.pnl for p in wins)
+    gross_loss = abs(sum(p.pnl for p in losses))
     return {
         "total_trades": len(all_trades),
         "buys": sum(1 for t in all_trades if t.side == "buy"),
         "sells": sum(1 for t in all_trades if t.side == "sell"),
-        "round_trips": len(trips),
+        "round_trips": len(positions),
         "wins": len(wins),
         "losses": len(losses),
-        "breakeven": len(trips) - len(wins) - len(losses),
-        "win_rate": len(wins) / len(trips) * 100 if trips else 0.0,
+        "breakeven": len(positions) - len(wins) - len(losses),
+        "win_rate": len(wins) / len(positions) * 100 if positions else 0.0,
         "total_pnl": total_pnl,
         "avg_win": gross_win / len(wins) if wins else 0.0,
         "avg_loss": -gross_loss / len(losses) if losses else 0.0,
-        "largest_win": max((r.pnl for r in wins), default=0.0),
-        "largest_loss": min((r.pnl for r in losses), default=0.0),
-        "expectancy": closed_pnl / len(trips) if trips else 0.0,
+        "largest_win": max((p.pnl for p in wins), default=0.0),
+        "largest_loss": min((p.pnl for p in losses), default=0.0),
+        "expectancy": total_pnl / len(positions) if positions else 0.0,
         "profit_factor": round(gross_win / gross_loss, 2) if gross_loss > 0 else 0.0,
     }
 
@@ -460,12 +543,12 @@ def _capital_and_flows(
 
 def _risk(
     capitals: Sequence[tuple[str, float]],
-    trips: Sequence[RoundTrip],
+    positions: Sequence[Position],
     flow_events: Sequence[tuple[str, float]],
 ) -> dict:
     returns = _flow_adjusted_returns(capitals, flow_events) if len(capitals) >= 2 else []
     dd_pct, dd_days = _compute_drawdown(returns) if returns else (0.0, 0)
-    win_streak, loss_streak = _compute_streaks(trips) if trips else (0, 0)
+    win_streak, loss_streak = _compute_streaks(positions) if positions else (0, 0)
     return {
         "max_drawdown_pct": dd_pct,
         "max_drawdown_days": dd_days,
@@ -475,32 +558,45 @@ def _risk(
     }
 
 
-def _costs(all_trades: list[Trade], closes: list[Trade]) -> dict:
+def _costs(all_trades: Sequence[Trade], positions: Sequence[Position]) -> dict:
     total_fees = sum(t.fees for t in all_trades)
-    total_pnl = sum(t.pnl for t in closes)
+    total_pnl = sum(p.pnl for p in positions)
     return {
         "total_fees": total_fees,
         "fees_pct_of_pnl": total_fees / abs(total_pnl) * 100 if total_pnl else 0.0,
     }
 
 
-def _category_win_rate(trips: Sequence[RoundTrip]) -> float:
-    return sum(1 for r in trips if r.pnl > 0) / len(trips) * 100 if trips else 0.0
+def _category_win_rate(positions: Sequence[Position]) -> float:
+    return sum(1 for p in positions if p.pnl > 0) / len(positions) * 100 if positions else 0.0
 
 
 def _behavior(
     all_trades: Sequence[Trade],
-    trips: Sequence[RoundTrip],
+    positions: Sequence[Position],
     tracked_since: str,
 ) -> dict:
     if tracked_since:
-        pre_system = [r for r in trips if r.close_date < tracked_since]
-        post_system = [r for r in trips if r.close_date >= tracked_since]
+        pre_system = [p for p in positions if p.close_date < tracked_since]
+        post_system = [p for p in positions if p.close_date >= tracked_since]
     else:
         pre_system = []
-        post_system = list(trips)
-    signal = [r for r in post_system if r.signal != "—"]
-    discretionary = [r for r in post_system if r.signal == "—"]
+        post_system = list(positions)
+    signal = [p for p in post_system if p.signal != "—"]
+    discretionary = [p for p in post_system if p.signal == "—"]
+
+    holds = [(p.symbol, p.hold_days) for p in positions]
+    if holds:
+        longest = max(holds, key=lambda h: h[1])
+        avg_hold = round(sum(d for _, d in holds) / len(holds), 1)
+        hold_stats = {
+            "avg_hold_days": avg_hold,
+            "longest_hold_days": longest[1],
+            "longest_hold_symbol": longest[0],
+        }
+    else:
+        hold_stats = {"avg_hold_days": 0.0, "longest_hold_days": 0, "longest_hold_symbol": ""}
+
     return {
         "signal_trades": len(signal),
         "discretionary_trades": len(discretionary),
@@ -509,30 +605,29 @@ def _behavior(
         "discretionary_win_rate": _category_win_rate(discretionary),
         "pre_system_win_rate": _category_win_rate(pre_system),
         "order_types": dict(_count_order_types(all_trades)),
-        **_hold_stats(all_trades),
+        **hold_stats,
     }
 
 
-def _exposure(
-    closes: Sequence[Trade],
-    grouped: Mapping[str, Sequence[RoundTrip]],
-) -> dict:
-    by_symbol: dict[str, float] = defaultdict(float)
+def _exposure(positions: Sequence[Position]) -> dict:
+    by_symbol: dict[str, list[Position]] = defaultdict(list)
     by_month: dict[str, float] = defaultdict(float)
-    for t in closes:
-        by_symbol[t.symbol] += t.pnl
-        by_month[t.date[:7]] += t.pnl
+    for p in positions:
+        by_symbol[p.symbol].append(p)
+        for close in p.closes:
+            by_month[close.date[:7]] += close.pnl
 
-    gross_abs = sum(abs(v) for v in by_symbol.values())
-    top_pnl = max(abs(v) for v in by_symbol.values()) if by_symbol else 0.0
+    symbol_pnl = {s: sum(p.pnl for p in ps) for s, ps in by_symbol.items()}
+    gross_abs = sum(abs(v) for v in symbol_pnl.values())
+    top_pnl = max(abs(v) for v in symbol_pnl.values()) if symbol_pnl else 0.0
     concentration = top_pnl / gross_abs * 100 if gross_abs > 0 else 0.0
 
     top: list[SymbolStats] = []
-    for symbol, pnl in sorted(by_symbol.items(), key=lambda x: x[1], reverse=True)[:10]:
-        symbol_trips = grouped.get(symbol, [])
-        trip_count = len(symbol_trips)
-        win_count = sum(1 for r in symbol_trips if r.pnl > 0)
-        loss_count = sum(1 for r in symbol_trips if r.pnl < 0)
+    for symbol, pnl in sorted(symbol_pnl.items(), key=lambda x: x[1], reverse=True)[:10]:
+        symbol_positions = by_symbol[symbol]
+        trip_count = len(symbol_positions)
+        win_count = sum(1 for p in symbol_positions if p.pnl > 0)
+        loss_count = sum(1 for p in symbol_positions if p.pnl < 0)
         top.append(
             SymbolStats(
                 symbol=symbol,
@@ -552,16 +647,19 @@ def _exposure(
     }
 
 
-def _rolling(trips: Sequence[RoundTrip], window: int = 10) -> tuple[RollingPoint, ...]:
-    if len(trips) < window:
+def _rolling(
+    positions: Sequence[Position],
+    window: int = 10,
+) -> tuple[RollingPoint, ...]:
+    if len(positions) < window:
         return ()
     points: list[RollingPoint] = []
-    for i in range(window, len(trips) + 1):
-        batch = trips[i - window : i]
-        wins = [r for r in batch if r.pnl > 0]
-        losses = [r for r in batch if r.pnl < 0]
-        gross_win = sum(r.pnl for r in wins)
-        gross_loss = abs(sum(r.pnl for r in losses))
+    for i in range(window, len(positions) + 1):
+        batch = positions[i - window : i]
+        wins = [p for p in batch if p.pnl > 0]
+        losses = [p for p in batch if p.pnl < 0]
+        gross_win = sum(p.pnl for p in wins)
+        gross_loss = abs(sum(p.pnl for p in losses))
         points.append(
             RollingPoint(
                 window=window,
@@ -574,27 +672,18 @@ def _rolling(trips: Sequence[RoundTrip], window: int = 10) -> tuple[RollingPoint
     return tuple(points)
 
 
-def _group_by_symbol(
-    trips: Sequence[RoundTrip],
-) -> dict[str, list[RoundTrip]]:
-    trips_by_symbol: dict[str, list[RoundTrip]] = defaultdict(list)
-    for r in trips:
-        trips_by_symbol[r.symbol].append(r)
-    return dict(trips_by_symbol)
-
-
-def _metrics_from_trips(
-    trips: Sequence[RoundTrip],
+def _metrics_excluding(
+    positions: Sequence[Position],
     excluded: str,
     reason: str,
 ) -> Robustness:
-    remaining = [r for r in trips if r.symbol != excluded]
+    remaining = [p for p in positions if p.symbol != excluded]
     if not remaining:
         return Robustness(excluded=excluded, reason=reason)
-    wins = [r for r in remaining if r.pnl > 0]
-    losses = [r for r in remaining if r.pnl < 0]
-    gross_win = sum(r.pnl for r in wins)
-    gross_loss = abs(sum(r.pnl for r in losses))
+    wins = [p for p in remaining if p.pnl > 0]
+    losses = [p for p in remaining if p.pnl < 0]
+    gross_win = sum(p.pnl for p in wins)
+    gross_loss = abs(sum(p.pnl for p in losses))
     return Robustness(
         excluded=excluded,
         reason=reason,
@@ -608,49 +697,28 @@ def _metrics_from_trips(
 
 
 def _robustness(
-    trips: Sequence[RoundTrip],
-    trips_by_symbol: Mapping[str, Sequence[RoundTrip]],
+    positions: Sequence[Position],
     n_best: int = 1,
     n_worst: int = 1,
 ) -> tuple[Robustness, ...]:
-    if len(trips_by_symbol) < 2:
+    by_symbol: dict[str, float] = defaultdict(float)
+    for p in positions:
+        by_symbol[p.symbol] += p.pnl
+    if len(by_symbol) < 2:
         return ()
-    symbols_by_pnl = sorted(
-        trips_by_symbol,
-        key=lambda s: sum(r.pnl for r in trips_by_symbol[s]),
-    )
+    ranked = sorted(by_symbol, key=lambda s: by_symbol[s])
     already_excluded: set[str] = set()
     results: list[Robustness] = []
-    for sym in reversed(symbols_by_pnl[-n_best:]):
-        results.append(_metrics_from_trips(trips, sym, "best"))
-        already_excluded.add(sym)
-    for sym in symbols_by_pnl[:n_worst]:
-        if sym not in already_excluded:
-            results.append(_metrics_from_trips(trips, sym, "worst"))
+    for symbol in reversed(ranked[-n_best:]):
+        results.append(_metrics_excluding(positions, symbol, "best"))
+        already_excluded.add(symbol)
+    for symbol in ranked[:n_worst]:
+        if symbol not in already_excluded:
+            results.append(_metrics_excluding(positions, symbol, "worst"))
     return tuple(results)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
-
-
-def _hold_durations(trades: Sequence[Trade]) -> list[tuple[str, int]]:
-    return [
-        (symbol, (date.fromisoformat(close) - date.fromisoformat(open_)).days)
-        for symbol, open_, close, _ in _walk_positions(trades)
-    ]
-
-
-def _hold_stats(trades: Sequence[Trade]) -> dict:
-    holds = _hold_durations(trades)
-    if not holds:
-        return {"avg_hold_days": 0.0, "longest_hold_days": 0, "longest_hold_symbol": ""}
-    longest = max(holds, key=lambda h: h[1])
-    avg = sum(d for _, d in holds) / len(holds)
-    return {
-        "avg_hold_days": round(avg, 1),
-        "longest_hold_days": longest[1],
-        "longest_hold_symbol": longest[0],
-    }
 
 
 def _count_order_types(trades: Sequence[Trade]) -> list[tuple[str, int]]:
@@ -684,9 +752,6 @@ def _compute_twr(
     cap_by_date = dict(capitals)
     flow_dates = sorted(d for d in flows_by_date if d in cap_by_date)
 
-    # TWR: split at each flow date
-    # period ends at flow date's closing NAV (pre-flow)
-    # next period starts at flow date's NAV + flow amount
     compound = 1.0
     period_start = capitals[0][1]
 
@@ -745,14 +810,14 @@ def _compute_drawdown(returns: Sequence[float]) -> tuple[float, int]:
     return round(max_dd, 2), max_dd_days
 
 
-def _compute_streaks(trips: Sequence[RoundTrip]) -> tuple[int, int]:
+def _compute_streaks(positions: Sequence[Position]) -> tuple[int, int]:
     max_win = max_loss = cur_win = cur_loss = 0
-    for r in trips:
-        if r.pnl > 0:
+    for p in positions:
+        if p.pnl > 0:
             cur_win += 1
             cur_loss = 0
             max_win = max(max_win, cur_win)
-        elif r.pnl < 0:
+        elif p.pnl < 0:
             cur_loss += 1
             cur_win = 0
             max_loss = max(max_loss, cur_loss)
