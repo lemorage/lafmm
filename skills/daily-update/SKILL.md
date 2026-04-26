@@ -31,19 +31,19 @@ connected a broker yet.
 ### 2. Fetch prices
 
 Read every `group.toml` in `~/.lafmm/data/` to get the full ticker
-list. Fetch closing prices for each ticker using the fetch-prices
-skill.
+list. Fetch closing prices for each ticker using the fetch script.
+See `references/fetch-prices.md` for the command and options.
 
 Run all tickers, leaders and tracked stocks across all groups.
-fetch-prices is idempotent, so fetching a ticker that's already current
+The script is idempotent, so fetching a ticker that's already current
 is a no-op.
 
 ### 3. Sync cache
 
-Run the sync-lafmm-cache skill to regenerate all markdown in `cache/`
-from the updated price data. This is where the engine processes today's
-close and produces any new signals, column transitions, or pivotal
-points.
+Regenerate all markdown in `cache/` from the updated price data.
+See `references/sync-lafmm-cache.md` for the command.
+This is where the engine processes today's close and produces any
+new signals, column transitions, or pivotal points.
 
 ### 4. Summarize changes
 

@@ -3,7 +3,7 @@ name: quote
 description: >
   Fetch real-time stock quotes. Use when the user asks "what's NVDA at?",
   "current price of X", or needs a live price for any US equity. Do not
-  use for historical data (use fetch-prices) or news (use web search).
+  use for historical data (use daily-update) or news (use web search).
 ---
 
 # Quote
@@ -46,7 +46,7 @@ For invalid tickers: `{"symbol": "XYZ", "error": "unknown ticker or no data"}`.
 | Need | Tool |
 |------|------|
 | Current price of a stock | This skill |
-| EOD price history for CSVs | fetch-prices |
+| EOD price history for CSVs | daily-update |
 | Company news, earnings, context | Web search |
 
 ## Rate limits

@@ -123,8 +123,8 @@ After scaffolding, invoke the other skills in order:
 
 1. **fetch-prices** — backfill ~90 days of data for each ticker:
    ```bash
-   uv run .claude/skills/fetch-prices/scripts/fetch.py NVDA --days 90
-   uv run .claude/skills/fetch-prices/scripts/fetch.py AVGO --days 90
+   uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 90
+   uv run .claude/skills/daily-update/scripts/fetch-prices.py AVGO --days 90
    ```
 
 2. **tune-thresholds** — compute ATR-based thresholds from the fetched data:

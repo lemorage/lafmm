@@ -327,7 +327,7 @@ def _tune_us_indices(root: Path) -> None:
 
 
 def _fetch_us_indices(root: Path) -> None:
-    fetch_script = root / SKILLS_DST / "fetch-prices" / "scripts" / "fetch.py"
+    fetch_script = root / SKILLS_DST / "daily-update" / "scripts" / "fetch-prices.py"
     if not fetch_script.exists():
         return
 

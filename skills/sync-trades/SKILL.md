@@ -100,7 +100,7 @@ Summarize for the user: "Synced 3 trades on 2026-04-10. 46 days
 already up to date."
 
 If `cache/` does not exist yet, all signals will be `—`. Tell the
-user: "Run sync-lafmm-cache first to enable signal tracking."
+user: "Run daily-update first to enable signal tracking."
 
 ## Signal timing
 

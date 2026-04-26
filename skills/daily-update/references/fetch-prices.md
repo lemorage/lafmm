@@ -1,17 +1,6 @@
----
-name: fetch-prices
-description: >
-  Fetch daily closing prices for stocks and ETFs, updating LAFMM CSV data
-  files. Use this skill whenever the user wants to update price data, populate
-  a new group's CSVs, backfill historical data, or when you notice data is
-  stale during analysis. Use it proactively before running sync or analysis
-  when you see CSVs are missing or outdated.
-  Not for real-time prices (use quote instead).
----
-
 # Fetch Prices
 
-This skill updates LAFMM's CSV price files with daily closing prices from
+This step updates LAFMM's CSV price files with daily closing prices from
 Yahoo Finance via yfinance. It handles the mechanical work of fetching,
 deduplicating, and appending — so the data is always in the right format
 for the engine.
@@ -35,22 +24,22 @@ for a ticker and concatenates them chronologically.
 
 ## The script
 
-`scripts/fetch.py` fetches closing prices for a ticker and writes to
+`scripts/fetch-prices.py` fetches closing prices for a ticker and writes to
 year-partitioned CSVs. It is idempotent — running it twice produces the
 same result.
 
 ```bash
 # Append latest prices (auto-discovers ticker dir under ~/.lafmm/data/)
-uv run .claude/skills/fetch-prices/scripts/fetch.py NVDA
+uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA
 
 # Explicit target (directory or file)
-uv run .claude/skills/fetch-prices/scripts/fetch.py NVDA --csv ~/.lafmm/data/semis/NVDA
+uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --csv ~/.lafmm/data/semis/NVDA
 
 # Backfill from a specific date
-uv run .claude/skills/fetch-prices/scripts/fetch.py NVDA --start 2026-01-02
+uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --start 2026-01-02
 
 # Last 30 calendar days
-uv run .claude/skills/fetch-prices/scripts/fetch.py NVDA --days 30
+uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 30
 ```
 
 The script prints each new row as it appends. If the data is already up
@@ -61,7 +50,7 @@ to date, it says so and exits.
 ### Updating one ticker
 
 ```bash
-uv run .claude/skills/fetch-prices/scripts/fetch.py SPY
+uv run .claude/skills/daily-update/scripts/fetch-prices.py SPY
 ```
 
 Auto-discovers `~/.lafmm/data/us-indices/SPY/` and appends to the
@@ -72,10 +61,10 @@ current year's CSV.
 Read `group.toml` for tickers, then fetch each:
 
 ```bash
-uv run .claude/skills/fetch-prices/scripts/fetch.py SPY
-uv run .claude/skills/fetch-prices/scripts/fetch.py QQQ
-uv run .claude/skills/fetch-prices/scripts/fetch.py DIA
-uv run .claude/skills/fetch-prices/scripts/fetch.py IWM
+uv run .claude/skills/daily-update/scripts/fetch-prices.py SPY
+uv run .claude/skills/daily-update/scripts/fetch-prices.py QQQ
+uv run .claude/skills/daily-update/scripts/fetch-prices.py DIA
+uv run .claude/skills/daily-update/scripts/fetch-prices.py IWM
 ```
 
 ### Populating a new group
@@ -83,8 +72,8 @@ uv run .claude/skills/fetch-prices/scripts/fetch.py IWM
 Backfill with enough history for the engine to establish its state:
 
 ```bash
-uv run .claude/skills/fetch-prices/scripts/fetch.py NVDA --days 90
-uv run .claude/skills/fetch-prices/scripts/fetch.py AVGO --days 90
+uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 90
+uv run .claude/skills/daily-update/scripts/fetch-prices.py AVGO --days 90
 ```
 
 90 calendar days gives roughly 60 trading days.

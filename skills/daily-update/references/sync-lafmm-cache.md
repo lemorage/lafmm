@@ -1,19 +1,6 @@
----
-name: sync-lafmm-cache
-description: >
-  Regenerate the cache/ directory from data/. Use this skill after
-  fetching new prices, after adding or modifying a group, or whenever
-  the cache is stale and you need fresh Livermore state for analysis.
-  Also use it when the user says "sync", "update cache", "refresh
-  analysis", "rebuild", or any variation that implies they want the
-  engine to reprocess all price data and produce updated markdown.
-  Use it proactively before any analysis that reads from cache/ — if
-  prices have been fetched since the last sync, the cache is outdated.
----
-
 # Sync LAFMM Cache
 
-This skill regenerates `~/.lafmm/cache/` by running the Livermore
+This step regenerates `~/.lafmm/cache/` by running the Livermore
 engine on all price data in `data/` and writing the results as
 markdown. The cache is what you read when analyzing market state — it
 must be in sync with the data for your analysis to be current.

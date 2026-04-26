@@ -20,7 +20,7 @@ Output is braille ANSI — high resolution in the terminal, no GUI needed.
 
 - User asks to see a stock's price, trend, or indicator
 - You're discussing a signal from cache/ and a visual would clarify
-- After fetch-prices completes and the user is in a review flow
+- After daily-update completes and the user is in a review flow
 - User says "show me", "plot", "graph", "chart", "candlestick", "K-line"
 - You want to confirm an observation ("RSI is elevated" — show it)
 
@@ -119,7 +119,7 @@ lafmm chart volume NVDA --period 60d
 
 ## Data freshness
 
-OHLCV data comes from CSV files updated by the fetch-prices skill.
+OHLCV data comes from CSV files updated by the daily-update skill.
 Before rendering, consider whether the data is current enough for
 what the user needs.
 
@@ -131,8 +131,8 @@ the latest date is not today, the data is stale.
 1. If the quote skill is configured, fetch the real-time price and
    mention it alongside the chart: "Chart shows through April 18.
    Current price from quote: $198.50 (+1.2%)."
-2. If quote is not configured, suggest running fetch-prices first:
-   "Data is through April 18. Run fetch-prices to update."
+2. If quote is not configured, suggest running daily-update first:
+   "Data is through April 18. Run daily-update to update."
 3. If the user doesn't need real-time, render as-is — the chart
    title makes the date range explicit.
 
@@ -184,7 +184,7 @@ The subcommand prints clear messages to stderr and exits:
   use `--group` to disambiguate.
 - **Unknown chart type**: lists all 13 available types.
 - **No data in period**: "no data in the requested period" — suggest
-  widening the period or running fetch-prices.
+  widening the period or running daily-update.
 - **Insufficient data for indicator**: indicators like SMA(50) need 50+
   data points. If the period is too short, the indicator line will be
   truncated or missing. Suggest a longer `--period`.
