@@ -6,6 +6,16 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
+class Bar:
+    date: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+
+
+@dataclass(frozen=True, slots=True)
 class PriceSeries:
     dates: tuple[str, ...]
     open: tuple[float, ...]
@@ -13,6 +23,28 @@ class PriceSeries:
     low: tuple[float, ...]
     close: tuple[float, ...]
     volume: tuple[int, ...]
+
+
+def bar_at(series: PriceSeries, index: int) -> Bar:
+    return Bar(
+        date=series.dates[index],
+        open=series.open[index],
+        high=series.high[index],
+        low=series.low[index],
+        close=series.close[index],
+        volume=series.volume[index],
+    )
+
+
+def bars_to_series(bars: Sequence[Bar]) -> PriceSeries:
+    return PriceSeries(
+        dates=tuple(bar.date for bar in bars),
+        open=tuple(bar.open for bar in bars),
+        high=tuple(bar.high for bar in bars),
+        low=tuple(bar.low for bar in bars),
+        close=tuple(bar.close for bar in bars),
+        volume=tuple(bar.volume for bar in bars),
+    )
 
 
 @dataclass(frozen=True, slots=True)

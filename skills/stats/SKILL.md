@@ -88,6 +88,10 @@ Omit it when showing the user their stats.
     {"excluded": "AAPL", "reason": "best", "round_trips": 40, "wins": 25, "losses": 15, "win_rate": 62.5, "expectancy": 20.00, "profit_factor": 1.30},
     {"excluded": "TSLA", "reason": "worst", "round_trips": 43, "wins": 30, "losses": 13, "win_rate": 69.8, "expectancy": 45.00, "profit_factor": 2.10}
   ],
+  "genome": [
+    {"code": "N-S-K-U", "trades": 9, "wins": 8, "losses": 1, "pnl": 1201.21, "win_rate": 88.9},
+    {"code": "W-S-K-U", "trades": 6, "wins": 3, "losses": 3, "pnl": -827.30, "win_rate": 50.0}
+  ],
   "spy_return_pct": 8.5
 }
 ```
@@ -103,8 +107,16 @@ Key fields for analysis:
 - `concentration_pct`: % of absolute P&L from top symbol. >50% is risky
 - `pre_system_trades` + `post_system_trades` = total round trips. pre-system = before `tracked_since`, post-system = after
 - `signal_trades` + `discretionary_trades` = post-system. signaled = opened on a system signal, discretionary = opened without one
-- `order_types`: dynamic dict — keys are whatever order types appear in trades (limit, market, stop, stop_limit, trail, etc.)
+- `order_types`: dynamic dict. Keys are whatever order types appear in trades (limit, market, stop, stop_limit, trail, etc.)
 - `avg_hold_days` / `longest_hold_days`: position hold duration from open→close reconstruction
+- `genome`: trade genome classification. Each bucket has a 4-letter type code across 4 axes:
+  - **Trend**: W (With-trend) / N (Neutral) / A (Against-trend). SMA 50/150/200 alignment at entry
+  - **Cadence**: F (Flash <1d) / S (Swing 1-20d) / P (Position >20d). Actual hold duration
+  - **Setup**: B (Breakout, within 1% of 50d high) / K (Pullback) / R (Reversal, within 5% of 50d low or RSI<30). Price structure at entry
+  - **Volume**: C (Confirmed, rel_vol >1.4x) / U (Unconfirmed). Volume at entry vs 50d average
+  - Example: `W-S-B-C` = With-trend Swing Breakout Confirmed. `?` = no OHLCV data for that ticker
+  - Edge = top 3 by P&L (your strengths). Leak = bottom 3 by P&L (your weaknesses)
+  - Populated automatically when `data/` exists in the workspace. Empty if no OHLCV data available
 - `spy_return_pct`: benchmark, null if SPY data unavailable
 
 ## What it computes
@@ -114,6 +126,7 @@ Key fields for analysis:
 **Risk**: max drawdown, drawdown duration, win/loss streaks, Sharpe ratio (flow-adjusted)
 **Costs**: trading fees, platform fees, dividends, tax, interest, fees as % of P&L
 **Behavior**: pre-system vs post-system split, post-system further split into signaled vs discretionary, hold duration
+**Genome**: 4-axis trade classification (Trend/Cadence/Setup/Volume) with edge/leak breakdown
 **Exposure**: top symbols by P&L, concentration risk, monthly P&L breakdown
 **Robustness**: leave-one-out analysis excluding best and worst performing symbols
 **Rolling**: sliding window win rate, expectancy, profit factor over round trips
@@ -138,6 +151,14 @@ When asked for a full summary (or at natural boundaries), write to
 
 Keep it honest. If discretionary trades underperform systematic ones,
 say so clearly.
+
+### Using genome data
+
+The genome reveals the trader's behavioral DNA. Use it to:
+- **Edge/Leak**: edge types (top P&L codes) = natural strengths. Leak types (bottom P&L) = where they bleed. Flag when they're about to enter a leak-type trade.
+- **Drift**: compare genome across periods (`--period 2026-Q1` vs `--period 2026-Q2`). If edge types disappear or leak types grow, the trader is drifting.
+- **Mirror**: if the trader claims to follow a system, check if their genome matches. "You say trend-following, but 60% of your trades are A-S-R-U (against-trend reversal)."
+- **Anchor insights to codes**: "Your N-S-K-U trades are 89% win rate, your strongest pattern. Your W-S-K-U trades are 50%, same setup in different trend context, loses edge."
 
 ## When to offer
 

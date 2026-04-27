@@ -28,6 +28,8 @@ from dataclasses import asdict, dataclass, field, replace
 from datetime import date, timedelta
 from pathlib import Path
 
+from lafmm.classify import Side
+
 # ── Types ────────────────────────────────────────────────────────────
 
 
@@ -57,7 +59,7 @@ class DayEntry:
 @dataclass(frozen=True, slots=True)
 class Position:
     symbol: str
-    side: str
+    side: Side
     open_date: str
     close_date: str
     opens: tuple[Trade, ...]
@@ -106,6 +108,16 @@ class Robustness:
     win_rate: float = 0.0
     expectancy: float = 0.0
     profit_factor: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class GenomeBucket:
+    code: str
+    trades: int
+    wins: int
+    losses: int
+    pnl: float
+    win_rate: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +177,7 @@ class Stats:
     monthly_pnl: tuple[MonthPnl, ...] = ()
     rolling: tuple[RollingPoint, ...] = ()
     robustness: tuple[Robustness, ...] = ()
+    genome: tuple[GenomeBucket, ...] = ()
     spy_return_pct: float | None = None
 
 
@@ -424,6 +437,7 @@ def compute(
     period_label: str = "all",
     benchmark_dir: Path | None = None,
     tracked_since: str = "",
+    data_dir: Path | None = None,
 ) -> Stats:
     if not entries:
         return Stats()
@@ -452,6 +466,7 @@ def compute(
         **_exposure(positions),
         rolling=_rolling(positions),
         robustness=_robustness(positions),
+        genome=_classify_positions(positions, data_dir),
         spy_return_pct=_benchmark(benchmark_dir, first, last) if benchmark_dir else None,
     )
 
@@ -839,6 +854,75 @@ def _compute_sharpe_from_returns(returns: Sequence[float]) -> float:
     return round(avg / std * (252**0.5), 2) if std > 0 else 0.0
 
 
+# ── Genome classification ──────────────────────────────────────────
+
+MIN_INDICATOR_BARS = 5
+
+
+def _classify_position(position: Position, data_dir: Path) -> str:
+    from lafmm.classify import classify_trade
+    from lafmm.fetch import find_ticker_dir
+    from lafmm.loader import load_price_series
+
+    ticker_dir = find_ticker_dir(data_dir, position.symbol)
+    if ticker_dir is None:
+        return "?"
+    series = load_price_series(ticker_dir)
+    if series is None or position.open_date not in series.dates:
+        return "?"
+    entry_idx = series.dates.index(position.open_date)
+    if entry_idx < MIN_INDICATOR_BARS:
+        return "?"
+    genome = classify_trade(
+        series.high,
+        series.low,
+        series.close,
+        [float(v) for v in series.volume],
+        entry_idx=entry_idx,
+        hold_days=position.hold_days,
+        side=position.side,
+    )
+    return genome.code
+
+
+def _build_genome_buckets(
+    by_code: dict[str, list[Position]],
+) -> tuple[GenomeBucket, ...]:
+    ranked = sorted(
+        by_code.items(),
+        key=lambda x: -abs(sum(p.pnl for p in x[1])),
+    )
+    buckets: list[GenomeBucket] = []
+    for code, code_positions in ranked:
+        wins = sum(1 for p in code_positions if p.pnl > 0)
+        losses = sum(1 for p in code_positions if p.pnl < 0)
+        count = len(code_positions)
+        buckets.append(
+            GenomeBucket(
+                code=code,
+                trades=count,
+                wins=wins,
+                losses=losses,
+                pnl=round(sum(p.pnl for p in code_positions), 2),
+                win_rate=round(wins / count * 100, 1) if count else 0.0,
+            )
+        )
+    return tuple(buckets)
+
+
+def _classify_positions(
+    positions: Sequence[Position],
+    data_dir: Path | None,
+) -> tuple[GenomeBucket, ...]:
+    if not data_dir or not data_dir.exists():
+        return ()
+    by_code: dict[str, list[Position]] = defaultdict(list)
+    for position in positions:
+        code = _classify_position(position, data_dir)
+        by_code[code].append(position)
+    return _build_genome_buckets(by_code)
+
+
 def _benchmark(price_dir: Path, start: str, end: str) -> float | None:
     prices: list[tuple[str, float]] = []
     for csv_file in sorted(price_dir.glob("*.csv")):
@@ -877,6 +961,7 @@ def main() -> None:
     account_dir = Path(sys.argv[1])
     period_str = None
     benchmark_dir = None
+    data_dir = None
 
     args = sys.argv[2:]
     i = 0
@@ -886,6 +971,9 @@ def main() -> None:
             i += 2
         elif args[i] == "--benchmark" and i + 1 < len(args):
             benchmark_dir = Path(args[i + 1])
+            i += 2
+        elif args[i] == "--data-dir" and i + 1 < len(args):
+            data_dir = Path(args[i + 1])
             i += 2
         else:
             i += 1
@@ -898,7 +986,14 @@ def main() -> None:
     if date_range:
         entries, capitals = _filter_by_period(entries, capitals, date_range)
 
-    stats = compute(entries, capitals, period_str or "all", benchmark_dir, tracked_since)
+    stats = compute(
+        entries,
+        capitals,
+        period_str or "all",
+        benchmark_dir,
+        tracked_since,
+        data_dir,
+    )
     print(json.dumps(asdict(stats), indent=2))
 
 

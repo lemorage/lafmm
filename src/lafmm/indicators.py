@@ -167,6 +167,32 @@ def tema(values: Sequence[float], period: int) -> list[float]:
     return [3 * a - 3 * b + c for a, b, c in zip(e1, e2, e3, strict=True)]
 
 
+def true_range(
+    highs: Sequence[float],
+    lows: Sequence[float],
+    closes: Sequence[float],
+) -> list[float]:
+    ranges = [highs[0] - lows[0]]
+    for i in range(1, len(closes)):
+        ranges.append(
+            max(
+                highs[i] - lows[i],
+                abs(highs[i] - closes[i - 1]),
+                abs(lows[i] - closes[i - 1]),
+            )
+        )
+    return ranges
+
+
+def atr(
+    highs: Sequence[float],
+    lows: Sequence[float],
+    closes: Sequence[float],
+    period: int = 14,
+) -> list[float]:
+    return rma(true_range(highs, lows, closes), period)
+
+
 def adx(
     highs: Sequence[float],
     lows: Sequence[float],
@@ -178,19 +204,12 @@ def adx(
         return [0.0] * n
     plus_dm: list[float] = [0.0]
     minus_dm: list[float] = [0.0]
-    tr: list[float] = [0.0]
     for i in range(1, n):
         up = highs[i] - highs[i - 1]
         down = lows[i - 1] - lows[i]
         plus_dm.append(up if up > down and up > 0 else 0.0)
         minus_dm.append(down if down > up and down > 0 else 0.0)
-        tr.append(
-            max(
-                highs[i] - lows[i],
-                abs(highs[i] - closes[i - 1]),
-                abs(lows[i] - closes[i - 1]),
-            )
-        )
+    tr = true_range(highs, lows, closes)
     smooth_tr = rma(tr, period)
     smooth_plus = rma(plus_dm, period)
     smooth_minus = rma(minus_dm, period)

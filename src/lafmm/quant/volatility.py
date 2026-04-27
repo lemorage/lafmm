@@ -1,31 +1,18 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
 
+from lafmm.indicators import atr as atr_series
 from lafmm.quant.types import PriceSeries, Returns, sample_variance
 
 TRADING_DAYS_PER_YEAR = 252
 
 
-def _true_ranges(series: PriceSeries) -> Sequence[float]:
-    if len(series.close) < 2:
-        return ()
-    return tuple(
-        max(
-            series.high[i] - series.low[i],
-            abs(series.high[i] - series.close[i - 1]),
-            abs(series.low[i] - series.close[i - 1]),
-        )
-        for i in range(1, len(series.close))
-    )
-
-
 def atr(series: PriceSeries, period: int = 14) -> float | None:
-    ranges = _true_ranges(series)
-    if len(ranges) < period:
+    if len(series.close) < period + 1:
         return None
-    return sum(ranges[-period:]) / period
+    values = atr_series(series.high, series.low, series.close, period)
+    return values[-1]
 
 
 def atr_pct(series: PriceSeries, period: int = 14) -> float | None:

@@ -7,6 +7,7 @@ import json
 import subprocess
 import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 import click
@@ -47,6 +48,9 @@ def render_stats(data: dict, console: Console | None = None) -> None:
     con.print(_grid("Costs & Income", _costs_pairs(data)))
     con.print()
     _behavior(data, con)
+    if data.get("genome"):
+        con.print()
+        _render_genome(data, con)
     con.print()
 
 
@@ -286,6 +290,16 @@ def _monthly(data: dict, con: Console) -> None:
     )
 
 
+WIN_RATE_GOOD = 60
+WIN_RATE_NEUTRAL = 50
+
+
+def _win_rate_color(rate: float) -> str:
+    if rate >= WIN_RATE_GOOD:
+        return "green"
+    return "yellow" if rate >= WIN_RATE_NEUTRAL else "red"
+
+
 # ── Top symbols ─────────────────────────────────────────────────────
 
 
@@ -307,7 +321,7 @@ def _symbols(data: dict, con: Console) -> None:
         win_count = s.get("wins", 0)
         loss_count = s.get("losses", 0)
         win_rate = s.get("win_rate", 0.0)
-        win_rate_color = "green" if win_rate >= 60 else ("yellow" if win_rate >= 50 else "red")
+        win_rate_color = _win_rate_color(win_rate)
         t.add_row(
             s["symbol"],
             _pnl(s["pnl"]),
@@ -387,6 +401,183 @@ def _behavior(data: dict, con: Console) -> None:
     con.print(Panel(t, title="[bold]Behavior[/]", border_style="blue", padding=(1, 1)))
 
 
+# ── Trade Genome ───────────────────────────────────────────────────
+
+GENOME_LABELS: dict[str, str] = {
+    "W": "With-trend",
+    "N": "Neutral",
+    "A": "Against-trend",
+    "F": "Flash",
+    "S": "Swing",
+    "P": "Position",
+    "B": "Breakout",
+    "K": "Pullback",
+    "R": "Reversal",
+    "C": "Confirmed",
+    "U": "Unconfirmed",
+}
+
+GENOME_AXES: tuple[tuple[str, int, tuple[str, ...]], ...] = (
+    ("Trend", 0, ("W", "N", "A")),
+    ("Setup", 2, ("B", "K", "R")),
+    ("Cadence", 1, ("F", "S", "P")),
+    ("Volume", 3, ("C", "U")),
+)
+
+GENOME_COLORS: tuple[str, ...] = ("cyan", "magenta", "yellow", "green", "blue")
+
+EDGE_LEAK_COUNT = 3
+
+
+@dataclass(frozen=True, slots=True)
+class _AxisSegment:
+    label: str
+    trades: int
+    wins: int
+    pnl: float
+
+    @property
+    def win_rate(self) -> float:
+        return self.wins / self.trades * 100 if self.trades else 0.0
+
+
+def _aggregate_axis(
+    buckets: Sequence[dict],
+    axis_idx: int,
+    keys: Sequence[str],
+) -> list[_AxisSegment]:
+    segments: list[_AxisSegment] = []
+    for code_letter in keys:
+        label = GENOME_LABELS.get(code_letter, code_letter)
+        trades = wins = 0
+        pnl = 0.0
+        for bucket in buckets:
+            if bucket["code"] == "?":
+                continue
+            parts = bucket["code"].split("-")
+            if len(parts) > axis_idx and parts[axis_idx] == code_letter:
+                trades += bucket["trades"]
+                wins += bucket["wins"]
+                pnl += bucket["pnl"]
+        if trades > 0:
+            segments.append(_AxisSegment(label, trades, wins, round(pnl, 2)))
+    return segments
+
+
+def _render_proportion_bar(
+    segments: Sequence[_AxisSegment],
+    width: int,
+) -> str:
+    total = sum(segment.trades for segment in segments)
+    if total == 0:
+        return ""
+    parts: list[str] = []
+    for i, segment in enumerate(segments):
+        segment_width = max(1, round(segment.trades / total * width))
+        color = GENOME_COLORS[i % len(GENOME_COLORS)]
+        parts.append(f"[{color}]{'█' * segment_width}[/]")
+    return "".join(parts)
+
+
+def _render_axis_legend(
+    segments: Sequence[_AxisSegment],
+) -> Table:
+    legend = Table(box=None, show_header=False, padding=(0, 1), pad_edge=False)
+    legend.add_column(no_wrap=True, min_width=4)
+    legend.add_column(style="bold", no_wrap=True, min_width=12)
+    legend.add_column(justify="right", min_width=4)
+    legend.add_column(justify="right", min_width=5)
+    legend.add_column(justify="right", min_width=8)
+    for i, segment in enumerate(segments):
+        color = GENOME_COLORS[i % len(GENOME_COLORS)]
+        win_rate = segment.win_rate
+        wr_color = _win_rate_color(win_rate)
+        legend.add_row(
+            f"  [{color}]■[/]",
+            segment.label,
+            str(segment.trades),
+            f"[{wr_color}]{win_rate:.0f}%[/]",
+            _pnl(segment.pnl),
+        )
+    return legend
+
+
+def _render_genome_row(table: Table, bucket: dict) -> None:
+    code = bucket["code"]
+    win_rate = bucket["win_rate"]
+    color = _win_rate_color(win_rate)
+    parts = code.split("-")
+    hint = " ".join(GENOME_LABELS.get(part) or part for part in parts)
+    table.add_row(
+        f"  {code}",
+        str(bucket["trades"]),
+        f"[{color}]{win_rate:.0f}%[/]",
+        _pnl(bucket["pnl"]),
+        hint,
+    )
+
+
+def _make_edge_leak_table() -> Table:
+    table = Table(box=None, show_header=False, padding=(0, 1), pad_edge=False)
+    table.add_column(style="bold", no_wrap=True, min_width=12)
+    table.add_column(justify="right", min_width=4)
+    table.add_column(justify="right", min_width=5)
+    table.add_column(justify="right", min_width=8)
+    table.add_column(style="dim", no_wrap=True)
+    return table
+
+
+def _render_edge_and_leak(buckets: Sequence[dict]) -> tuple[Table, Table]:
+    classified = [b for b in buckets if b["code"] != "?"]
+    winners = sorted([b for b in classified if b["pnl"] > 0], key=lambda b: -b["pnl"])
+    losers = sorted([b for b in classified if b["pnl"] < 0], key=lambda b: b["pnl"])
+
+    edge = _make_edge_leak_table()
+    for bucket in winners[:EDGE_LEAK_COUNT]:
+        _render_genome_row(edge, bucket)
+
+    leak = _make_edge_leak_table()
+    for bucket in losers[:EDGE_LEAK_COUNT]:
+        _render_genome_row(leak, bucket)
+
+    return edge, leak
+
+
+def _build_axis_parts(
+    buckets: Sequence[dict],
+    bar_width: int,
+) -> list[Text | Table]:
+    parts: list[Text | Table] = []
+    for axis_name, axis_idx, keys in GENOME_AXES:
+        segments = _aggregate_axis(buckets, axis_idx, keys)
+        if not segments:
+            continue
+        bar = _render_proportion_bar(segments, bar_width)
+        parts.append(Text.from_markup(f"  [bold]{axis_name}[/]"))
+        parts.append(Text.from_markup(f"  {bar}"))
+        parts.append(_render_axis_legend(segments))
+        parts.append(Text(""))
+    return parts
+
+
+def _render_genome(data: dict, con: Console) -> None:
+    buckets = data.get("genome", [])
+    if not buckets:
+        return
+
+    parts = _build_axis_parts(buckets, max(40, con.width - 12))
+    edge, leak = _render_edge_and_leak(buckets)
+    parts.append(Text.from_markup("  [bold green]Edge[/]"))
+    parts.append(edge)
+    parts.append(Text(""))
+    parts.append(Text.from_markup("  [bold red]Leak[/]"))
+    parts.append(leak)
+
+    con.print(
+        Panel(Group(*parts), title="[bold]Trade Genome[/]", border_style="blue", padding=(1, 2))
+    )
+
+
 # ── Formatting helpers ──────────────────────────────────────────────
 
 
@@ -458,6 +649,9 @@ def run_compute(
         spy_dir = lafmm_dir / "data" / "us-indices" / "SPY"
         if spy_dir.exists():
             cmd.extend(["--benchmark", str(spy_dir)])
+    data_dir = lafmm_dir / "data"
+    if data_dir.exists():
+        cmd.extend(["--data-dir", str(data_dir)])
 
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if result.returncode != 0:

@@ -63,6 +63,14 @@ def stats(account: str | None, period: str | None, benchmark: bool, as_json: boo
         click.echo("  use the sync-trades skill to import broker data first")
         return
 
+    data_dir = root / "data"
+    if data_dir.exists():
+        from lafmm.fetch import ensure_history
+
+        updated = ensure_history(account_dir, data_dir)
+        if updated:
+            click.echo(f"backfilled OHLCV: {', '.join(updated)}")
+
     data = run_compute(root, account_dir, period, benchmark)
     if as_json:
         click.echo(json_mod.dumps(data, indent=2))
