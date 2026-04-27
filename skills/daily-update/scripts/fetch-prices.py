@@ -24,72 +24,23 @@ SPDX-License-Identifier: GPL-3.0-only
 from __future__ import annotations
 
 import argparse
-import contextlib
 import csv
 import sys
-from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from lafmm.fetch import fetch_bars, find_ticker_dir, read_existing_dates, write_bars
+from lafmm.quant.types import Bar
+
 if TYPE_CHECKING:
     from _csv import _writer
-
-import yfinance as yf
 
 HEADER = ["date", "open", "high", "low", "close", "volume"]
 
 
-@dataclass(frozen=True, slots=True)
-class Bar:
-    date: str
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: int
-
-
-def fetch_bars(ticker: str, start: date, end: date) -> Sequence[Bar]:
-    data = yf.download(ticker, start=start.isoformat(), end=end.isoformat(), progress=False)
-    if data is None or data.empty:
-        return []
-
-    if hasattr(data.columns, "droplevel"):
-        with contextlib.suppress(IndexError, ValueError):
-            data.columns = data.columns.droplevel(1)
-
-    ohlcv = data[["Open", "High", "Low", "Close", "Volume"]]
-    bars: list[Bar] = [
-        Bar(
-            date=str(ohlcv.index[i])[:10],
-            open=round(float(ohlcv.iat[i, 0]), 2),
-            high=round(float(ohlcv.iat[i, 1]), 2),
-            low=round(float(ohlcv.iat[i, 2]), 2),
-            close=round(float(ohlcv.iat[i, 3]), 2),
-            volume=int(ohlcv.iat[i, 4]),
-        )
-        for i in range(len(ohlcv))
-    ]
-    return bars
-
-
-def read_existing_dates(path: Path) -> set[str]:
-    if path.is_dir():
-        dates: set[str] = set()
-        for csv_file in path.glob("*.csv"):
-            with csv_file.open() as f:
-                dates.update(row["date"] for row in csv.DictReader(f))
-        return dates
-    if path.is_file():
-        with path.open() as f:
-            return {row["date"] for row in csv.DictReader(f)}
-    return set()
-
-
-def _write_bar(writer: _writer, bar: Bar) -> None:
+def _write_bar_with_echo(writer: _writer, bar: Bar) -> None:
     row = [
         bar.date,
         f"{bar.open:.2f}",
@@ -102,26 +53,6 @@ def _write_bar(writer: _writer, bar: Bar) -> None:
     print(",".join(str(v) for v in row))
 
 
-def append_bars_partitioned(ticker_dir: Path, bars: Sequence[Bar]) -> int:
-    ticker_dir.mkdir(parents=True, exist_ok=True)
-    by_year: dict[str, list[Bar]] = defaultdict(list)
-    for bar in bars:
-        by_year[bar.date[:4]].append(bar)
-
-    added = 0
-    for year, year_bars in sorted(by_year.items()):
-        csv_path = ticker_dir / f"{year}.csv"
-        is_new = not csv_path.exists() or csv_path.stat().st_size == 0
-        with csv_path.open("a", newline="") as f:
-            writer = csv.writer(f)
-            if is_new:
-                writer.writerow(HEADER)
-            for bar in year_bars:
-                _write_bar(writer, bar)
-                added += 1
-    return added
-
-
 def append_bars_flat(csv_path: Path, bars: Sequence[Bar]) -> int:
     is_new = not csv_path.exists() or csv_path.stat().st_size == 0
     csv_path.parent.mkdir(parents=True, exist_ok=True)
@@ -130,28 +61,18 @@ def append_bars_flat(csv_path: Path, bars: Sequence[Bar]) -> int:
         if is_new:
             writer.writerow(HEADER)
         for bar in bars:
-            _write_bar(writer, bar)
+            _write_bar_with_echo(writer, bar)
     return len(bars)
-
-
-def find_ticker_dir(ticker: str) -> Path | None:
-    lafmm_data = Path.home() / ".lafmm" / "data"
-    if not lafmm_data.exists():
-        return None
-    for group_dir in sorted(lafmm_data.iterdir()):
-        if not group_dir.is_dir():
-            continue
-        candidate = group_dir / ticker
-        if candidate.is_dir():
-            return candidate
-    return None
 
 
 def resolve_target(ticker: str, explicit: Path | None) -> Path:
     if explicit is not None:
         return explicit
-    if found := find_ticker_dir(ticker):
-        return found
+    data_dir = Path.home() / ".lafmm" / "data"
+    if data_dir.exists():
+        found = find_ticker_dir(data_dir, ticker)
+        if found is not None:
+            return found
     return Path.cwd() / ticker
 
 
@@ -189,7 +110,7 @@ def run_fetch(ticker: str, target: Path, start: date) -> None:
         sys.exit(0)
 
     if target.is_dir() or not target.suffix:
-        added = append_bars_partitioned(target, new_bars)
+        added = write_bars(target, new_bars)
     else:
         added = append_bars_flat(target, new_bars)
 
