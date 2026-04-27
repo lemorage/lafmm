@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0
+
+- new: trade genome classification (4-axis type codes: Trend/Setup/Cadence/Volume)
+- new: genome panel in `lafmm stats` with proportion bars, edge/leak breakdown
+- new: OHLCV auto-fetch and backfill for classification (`data/_adhoc/`)
+- new indicators: RMA, ATR, true_range, stochastic, williams_r, CCI, DEMA, TEMA, ADX, OBV, VWAP, relative_volume
+- fix: signal matching uses direction-aware walk-back instead of D-1 lookback
+- refactor: ATR single source of truth in indicators.py (deduplicated from quant/volatility and classify)
+- stats: per-symbol round-trip breakdown, rolling 10-trip metrics, robustness analysis
+- stats: hierarchical behavior section with post-system split
+- fix: round-trip based stats with flow-adjusted Sharpe
+- new skill: detect-regime with Hurst exponent and variance ratio
+- refactor: absorb fetch-prices and sync-cache scripts into daily-update skill
+- fix: access yfinance columns by name instead of position (prevents silent data corruption)
+- TUI: freeze first column in map table for horizontal scroll
+
 ## 0.4.0
 
 - new: braille canvas chart engine, universal renderer with 13 composers
