@@ -85,8 +85,12 @@ Interest: +USD 4.23
 - **Capital**: total account value (cash + positions) from NAV in Base
 - **Cash flows**: deposits, withdrawals, dividends, tax, interest, fees in original currency
 - **signal**: filled automatically from `cache/` during import.
-  For dates after `tracked_since`, the script looks up the most recent
-  signal from D-1's close. `—` if no cache exists or date predates tracking.
+  For dates after `tracked_since`, the script finds the most recent
+  signal that matches the trade direction (BUY for buys, SELL for sells).
+  WATCH/DANGER signals are skipped (informational, not actionable).
+  A contradicting signal (e.g., SELL active but trader buys) stops the
+  search and the trade is marked discretionary.
+  `—` if no cache exists, date predates tracking, or no matching signal.
 
 ## After import
 
@@ -104,17 +108,22 @@ user: "Run daily-update first to enable signal tracking."
 
 ## Signal timing
 
-The signal column records what signal the trader could have been
-acting on. The engine processes closing prices. A signal fires
-after market close on Day N. The trader sees it and acts on
-Day N+1. The parse script handles this automatically: for a
-trade on date D, it finds the most recent signal on or before D-1.
+The engine processes closing prices. A signal fires after market
+close on Day N. The trader sees it and can act on Day N+1 or later.
+
+The matching algorithm walks backwards through all signals for the
+ticker, strictly before the trade date:
+1. Skip WATCH and DANGER (informational, not entry signals)
+2. If the signal direction matches the trade (BUY + buy, SELL + sell),
+   attach it
+3. If the signal direction contradicts (BUY + sell, SELL + buy), stop
+   searching. The trade goes against the system's most recent opinion.
+
+No time limit. A BUY signal stays active until a SELL fires. This
+is correct for trend-following: the signal IS the trend state.
 
 Only dates after `tracked_since` from `account.toml` get signals.
-Earlier entries predate LAFMM — their signal stays `—`.
-
-Post-`tracked_since` signal alignment enables the key question:
-how many trades followed a Livermore signal vs. discretionary.
+Earlier entries predate LAFMM and stay as `—`.
 
 ## Setup
 

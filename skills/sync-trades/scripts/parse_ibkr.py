@@ -27,7 +27,6 @@ import sys
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, timedelta
 from pathlib import Path
 
 ORDER_MAP: Mapping[str, str] = {"LMT": "limit", "MKT": "market", "STP": "stop"}
@@ -68,23 +67,37 @@ def load_signal_index(cache_dir: Path) -> SignalIndex:
     return index
 
 
-def lookup_signal(index: SignalIndex, symbol: str, trade_date: str) -> str:
+_SKIP_PREFIXES = frozenset({"WATCH", "DANGER"})
+
+
+def _compact_to_iso(date_str: str) -> str:
+    if len(date_str) == 8 and "-" not in date_str:
+        return f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
+    return date_str
+
+
+def lookup_signal(
+    index: SignalIndex,
+    symbol: str,
+    trade_date: str,
+    trade_side: str,
+) -> str:
     signals = index.get(symbol, ())
     if not signals:
         return "—"
-    d = date(int(trade_date[:4]), int(trade_date[4:6]), int(trade_date[6:8]))
-    cutoff = (d - timedelta(days=1)).isoformat()
-    latest_date = ""
-    hits: list[str] = []
-    for sig_date, label in signals:
-        if sig_date > cutoff:
+    trade_date_iso = _compact_to_iso(trade_date)
+    is_buy = trade_side == "buy"
+    for signal_date, label in reversed(signals):
+        if signal_date >= trade_date_iso:
             continue
-        if sig_date > latest_date:
-            latest_date = sig_date
-            hits = [label]
-        elif sig_date == latest_date:
-            hits.append(label)
-    return ", ".join(hits) if hits else "—"
+        prefix = label.split()[0] if label else ""
+        if prefix in _SKIP_PREFIXES:
+            continue
+        if (prefix == "BUY" and is_buy) or (prefix == "SELL" and not is_buy):
+            return label
+        # Signal direction contradicts trade direction — stop searching.
+        return "—"
+    return "—"
 
 
 JOURNAL_README = """\
@@ -309,7 +322,7 @@ def _format_day(
         for t in day_trades:
             sig = "—"
             if can_fill and signals is not None:
-                sig = lookup_signal(signals, t.symbol, t.date)
+                sig = lookup_signal(signals, t.symbol, t.date, t.side)
             lines.append(_format_trade_row(t, sig))
         lines.append("")
 
@@ -413,9 +426,7 @@ def write_capital(capital_dir: Path, nav: dict[str, float]) -> int:
 
 
 def _nav_date(d: str) -> str:
-    if len(d) == 8 and "-" not in d:
-        return f"{d[:4]}-{d[4:6]}-{d[6:8]}"
-    return d
+    return _compact_to_iso(d)
 
 
 def _read_tracked_since(account_dir: Path) -> str:

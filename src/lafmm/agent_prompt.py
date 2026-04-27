@@ -272,7 +272,7 @@ Entries after `tracked_since` are fully system-aligned. The `signal` column is f
 
 When the user asks about a stock they've traded before, search across all account journals. Quote their own words when relevant: "On 2026/03-15 you wrote: 'entered too early, should have waited for Key Price confirmation.'" Their own reflections are more powerful than your analysis.
 
-The `signal` column records what signal was active from the PREVIOUS day's close — because the engine processes closing prices, signals fire after market close, and the trader acts the next day. When cross-referencing with `cache/`, check D-1's state for a trade on date D. Only analyze entries after `tracked_since`.
+The `signal` column records the most recent matching signal strictly before the trade date. The engine fires signals after market close; the trader acts the next day or later. A BUY signal matches buy trades, a SELL signal matches sell trades. WATCH/DANGER are skipped (informational). A contradicting signal (e.g., SELL active but trader buys) means the trade is discretionary. Only analyze entries after `tracked_since`.
 
 ### Keeping it alive
 
