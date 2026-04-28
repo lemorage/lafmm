@@ -296,11 +296,7 @@ def _scaffold_us_indices(root: Path) -> None:
     )
 
     for ticker in (*US_INDICES_LEADERS, *US_INDICES_TRACKED):
-        ticker_dir = group_dir / ticker
-        ticker_dir.mkdir(exist_ok=True)
-        csv_path = ticker_dir / f"{date.today().year}.csv"
-        if not csv_path.exists():
-            csv_path.write_text("date,open,high,low,close,volume\n")
+        (group_dir / ticker).mkdir(exist_ok=True)
 
 
 def _tune_us_indices(root: Path) -> None:
@@ -326,19 +322,28 @@ def _tune_us_indices(root: Path) -> None:
     _write_group_toml(group_dir / "group.toml", swing_pct, confirm_pct)
 
 
+SCAFFOLD_HISTORY_DAYS = 730
+
+
 def _fetch_us_indices(root: Path) -> None:
     fetch_script = root / SKILLS_DST / "daily-update" / "scripts" / "fetch-prices.py"
     if not fetch_script.exists():
         return
 
-    year = str(date.today().year)
-    start = f"{year}-01-01"
     group_dir = root / HUMAN_DATA / US_INDICES_GROUP
 
     for ticker in (*US_INDICES_LEADERS, *US_INDICES_TRACKED):
-        csv_path = group_dir / ticker / f"{year}.csv"
+        ticker_dir = group_dir / ticker
         result = subprocess.run(
-            [sys.executable, str(fetch_script), ticker, "--csv", str(csv_path), "--start", start],
+            [
+                sys.executable,
+                str(fetch_script),
+                ticker,
+                "--csv",
+                str(ticker_dir),
+                "--days",
+                str(SCAFFOLD_HISTORY_DAYS),
+            ],
             check=False,
         )
         if result.returncode != 0:

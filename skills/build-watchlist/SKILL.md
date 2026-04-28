@@ -121,11 +121,14 @@ are placeholders — they get calibrated in the next step.
 
 After scaffolding, invoke the other skills in order:
 
-1. **fetch-prices** — backfill ~90 days of data for each ticker:
+1. **fetch-prices** — backfill 2 years of data for each ticker (SMA 200 needs ~250 bars for warmup):
    ```bash
-   uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 90
-   uv run .claude/skills/daily-update/scripts/fetch-prices.py AVGO --days 90
+   uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 730
+   uv run .claude/skills/daily-update/scripts/fetch-prices.py AVGO --days 730
    ```
+   Before fetching, check if `data/_adhoc/{TICKER}/` exists. If so, move
+   it to the group directory instead of fetching, then delete the
+   `_adhoc/{TICKER}/` directory to avoid duplicates.
 
 2. **tune-thresholds** — compute ATR-based thresholds from the fetched data:
    ```bash
@@ -174,7 +177,7 @@ User: "I want to track semiconductors"
 You would: read sector-criteria.md, confirm NVDA + AVGO as leaders
 (highest volume, different sub-sectors — GPU vs broadcom/networking),
 ask if they want to track AMD or INTC too, scaffold the directory, fetch
-90 days of prices, run tune-thresholds, present the result.
+2 years of prices, run tune-thresholds, present the result.
 
 **Example 2: Opportunity scan**
 

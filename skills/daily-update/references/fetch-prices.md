@@ -69,14 +69,14 @@ uv run .claude/skills/daily-update/scripts/fetch-prices.py IWM
 
 ### Populating a new group
 
-Backfill with enough history for the engine to establish its state:
+Backfill with 2 years of history for SMA 200 warmup and rich pivot structure:
 
 ```bash
-uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 90
-uv run .claude/skills/daily-update/scripts/fetch-prices.py AVGO --days 90
+uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 730
+uv run .claude/skills/daily-update/scripts/fetch-prices.py AVGO --days 730
 ```
 
-90 calendar days gives roughly 60 trading days.
+730 calendar days gives roughly 500 trading days.
 
 ## What it produces
 
