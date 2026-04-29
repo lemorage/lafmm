@@ -107,6 +107,42 @@ already up to date."
 If `cache/` does not exist yet, all signals will be `—`. Tell the
 user: "Run daily-update first to enable signal tracking."
 
+## Place untracked tickers
+
+The engine and stats need price history for every traded symbol.
+After every import, check if any traded ticker is not in any tracked
+group (`data/{group}/{TICKER}/`). For each untracked ticker:
+
+1. Look it up. Run `yf.Ticker(symbol).info` to get `quoteType`,
+   `sector`, `industry`, and `longName`. If Yahoo fails, web search
+   "what is {TICKER} stock" instead. Do not guess from training data.
+
+2. Decide placement:
+   - **Leveraged/inverse ETF** (`quoteType: ETF` and name contains
+     "Ultra", "ProShares", "Direxion", "2x", "3x", "-1x", "inverse",
+     or similar). Place in `data/_adhoc/{TICKER}/`.
+   - **Equity that fits an existing group.** Read each group's
+     `group.toml` name and the tickers already in it. If the stock's
+     industry matches a group's theme, add it there. Example: AMD
+     (industry: Semiconductors) fits `semis/` which has NVDA and AVGO.
+   - **Equity with no matching group.** Place in `data/_adhoc/` for
+     now. If the user repeatedly trades tickers in the same untracked
+     sector, suggest creating a new group via build-watchlist.
+
+3. For any ticker placed in a group or `_adhoc`:
+   ```bash
+   uv run .claude/skills/daily-update/scripts/fetch-prices.py {TICKER} \
+     --csv data/{group}/{TICKER} --days 730
+   ```
+   If `data/_adhoc/{TICKER}/` already has data and you are moving
+   it to a group, move the directory instead of re-fetching.
+
+4. If any ticker was added to a tracked group, run `lafmm sync` to
+   rebuild the cache so the new ticker gets engine state and signals.
+
+Do not ask the user for confirmation. Use your judgment. Report what
+you placed and where in your import summary.
+
 ## Signal timing
 
 The engine processes closing prices. A signal fires after market
