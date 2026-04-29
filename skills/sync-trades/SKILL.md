@@ -2,8 +2,9 @@
 name: sync-trades
 description: >
   Get trades into the journal. Two modes: user provides a broker CSV,
-  or auto-fetch from IBKR API. Use when the user says "import my trades,"
-  "sync my trades," provides a CSV, or wants to update their journal.
+  or auto-fetch from IBKR API. Use when the user says "import my trades",
+  "sync my trades", "get my executions", "pull trades from broker",
+  provides a CSV file, or wants to update their trade journal.
 ---
 
 # Sync Trades

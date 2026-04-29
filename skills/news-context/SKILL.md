@@ -6,15 +6,10 @@ description: >
   movements — whether you are building a watchlist and need to know which
   sectors have active catalysts, analyzing why a stock or sector moved
   unexpectedly, researching what macro events might impact a position,
-  performing any market analysis that benefits from recent headlines, or the
-  user asks about latest developments in a sector, commodity, or the broad
-  market. Also use this when the user says things like "check the news",
-  "what's happening with X", "why did Y drop", "what's moving today", "any
-  news on...", "latest on...", "what's going on with...", "market update",
-  "what should I know about...", or any variation that implies they want
-  current financial information. Use it proactively when you judge that news
-  context would improve the quality of your analysis — you do not need to
-  be asked.
+  or the user asks about latest developments in a sector, commodity, or
+  the broad market. Also use when the user says "check the news", "why
+  did Y drop", "what's moving today", "any news on...", or "market update".
+  Use proactively when news context would improve your analysis quality.
 ---
 
 # News Context
