@@ -138,6 +138,23 @@ def sync() -> None:
     sync_market(data_dir, cache_dir)
 
 
+# ── Tape subcommand ─────────────────────────────────────────────────
+
+
+@main.command()
+@click.argument("when", required=False, metavar="WHEN")
+@click.argument("text", required=False, metavar="TEXT")
+def tape(when: str | None, text: str | None) -> None:
+    """Record a tape. WHEN: today, yesterday, 3d, 04-25, 2026-04-25."""
+    from lafmm.tape import run_tape
+
+    root = get_root()
+    if root is None:
+        click.echo("run 'lafmm' first to set up")
+        return
+    run_tape(root, when, text)
+
+
 # ── Bootstrap ────────────────────────────────────────────────────────
 
 

@@ -143,6 +143,17 @@ group (`data/{group}/{TICKER}/`). For each untracked ticker:
 Do not ask the user for confirmation. Use your judgment. Report what
 you placed and where in your import summary.
 
+## Attach tape observations
+
+After import, check `~/.lafmm/tape.md` for pending tapes. The trader
+records thoughts at trade time via `lafmm tape`. Each entry is a
+`## YYYY-MM-DD` header followed by free text.
+
+Paste matching tape entries into the journal's `## Observations`
+section by date. Preserve the trader's voice verbatim. Remove
+matched entries from `tape.md`. Flag any trades with no tape entry
+and any tape entries with no matching trades.
+
 ## Signal timing
 
 The engine processes closing prices. A signal fires after market
