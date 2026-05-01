@@ -1,5 +1,15 @@
 from lafmm.quant.correlation import pairwise_correlation, rolling_correlation
 from lafmm.quant.regime import Regime, detect_regime, hurst_exponent, variance_ratio
+from lafmm.quant.risk import (
+    DrawdownResult,
+    drawdown_percentile,
+    half_kelly,
+    kelly_fraction,
+    max_drawdown,
+    monte_carlo_drawdown,
+    portfolio_heat,
+    position_size,
+)
 from lafmm.quant.signal import (
     DecayPoint,
     HitRateResult,
@@ -13,6 +23,7 @@ from lafmm.quant.volatility import atr, atr_pct, realized_vol
 
 __all__ = [
     "DecayPoint",
+    "DrawdownResult",
     "HitRateResult",
     "PriceSeries",
     "Regime",
@@ -20,8 +31,15 @@ __all__ = [
     "atr",
     "atr_pct",
     "detect_regime",
+    "drawdown_percentile",
+    "half_kelly",
     "hurst_exponent",
+    "kelly_fraction",
+    "max_drawdown",
+    "monte_carlo_drawdown",
     "pairwise_correlation",
+    "portfolio_heat",
+    "position_size",
     "realized_vol",
     "rolling_correlation",
     "signal_decay",
