@@ -141,7 +141,51 @@ def find_ticker_dir(data_dir: Path, symbol: str) -> Path | None:
     return None
 
 
+REGIME_TICKERS: dict[str, str] = {
+    "^VIX": "VIX",
+    "^VIX3M": "VIX3M",
+}
+
+
+def _ref_dir(data_dir: Path) -> Path:
+    for group_dir in sorted(data_dir.iterdir()):
+        if not group_dir.is_dir() or group_dir.name.startswith("."):
+            continue
+        ref = group_dir / "_ref"
+        if ref.is_dir():
+            return ref
+    return data_dir / "us-indices" / "_ref"
+
+
 # ── Public API ─────────────────────────────────────────────────────
+
+
+def ensure_regime_data(
+    data_dir: Path,
+    min_bars: int = 250,
+) -> list[str]:
+    ref = _ref_dir(data_dir)
+    end = date.today() + timedelta(days=1)
+    calendar_days = int(min_bars * TRADING_TO_CALENDAR)
+    start = end - timedelta(days=calendar_days)
+
+    updated: list[str] = []
+    for yahoo_ticker, local_name in REGIME_TICKERS.items():
+        ticker_dir = ref / local_name
+        existing = read_existing_dates(ticker_dir)
+        if len(existing) >= min_bars:
+            continue
+        bars = fetch_bars(yahoo_ticker, start, end)
+        if not bars:
+            print(f"fetch {local_name}: no data", file=sys.stderr)
+            continue
+        new_bars = [bar for bar in bars if bar.date not in existing]
+        if not new_bars:
+            continue
+        added = write_bars(ticker_dir, new_bars)
+        if added > 0:
+            updated.append(local_name)
+    return updated
 
 
 def ensure_history(

@@ -167,6 +167,22 @@ def tema(values: Sequence[float], period: int) -> list[float]:
     return [3 * a - 3 * b + c for a, b, c in zip(e1, e2, e3, strict=True)]
 
 
+def zscore(values: Sequence[float], period: int = 20) -> list[float]:
+    means = sma(values, period)
+    result: list[float] = []
+    for i in range(len(values)):
+        start = max(0, i - period + 1)
+        window = values[start : i + 1]
+        if len(window) < 2:
+            result.append(0.0)
+            continue
+        mean = means[i]
+        variance = sum((v - mean) ** 2 for v in window) / (len(window) - 1)
+        std = variance**0.5
+        result.append((values[i] - mean) / std if std > 0 else 0.0)
+    return result
+
+
 def true_range(
     highs: Sequence[float],
     lows: Sequence[float],

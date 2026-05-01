@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from lafmm.indicators import relative_volume, rsi, sma
+from lafmm.indicators import relative_volume, rsi, sma, zscore
 
 type Trend = Literal["W", "N", "A"]
 type Cadence = Literal["F", "S", "P"]
 type Setup = Literal["B", "K", "R"]
 type VolumeConfirm = Literal["C", "U"]
-type Regime = Literal["BULL", "CHOP", "BEAR", "PANIC"]
+type Regime = Literal["BULL", "STRESS", "COMPLACENT", "BEAR", "CHOP", "PANIC"]
 type Side = Literal["long", "short"]
 
 
@@ -25,6 +26,10 @@ class ClassifyConfig:
     reversal_proximity_pct: float = 5.0
     reversal_rsi: float = 30.0
     volume_threshold: float = 1.4
+    regime_vix_zscore_lookback: int = 60
+    regime_vix_zscore_high: float = 1.5
+    regime_vix_zscore_low: float = -1.0
+    regime_backwardation_threshold: float = 1.05
 
 
 DEFAULT_CONFIG = ClassifyConfig()
@@ -159,18 +164,57 @@ def classify_trade(
     return classify(snapshot, config)
 
 
-def market_regime(
-    index_closes: Sequence[float],
+def _spy_trend(
+    spy_closes: Sequence[float],
     entry_idx: int,
-    vix: float | None = None,
-) -> Regime:
-    if vix is not None and vix >= 35:
-        return "PANIC"
-    close = index_closes[entry_idx]
-    sma_50 = sma(index_closes, 50)[entry_idx]
-    sma_200 = sma(index_closes, 200)[entry_idx]
+) -> Literal["bull", "bear", "chop"]:
+    sma_50 = sma(spy_closes, 50)[entry_idx]
+    sma_200 = sma(spy_closes, 200)[entry_idx]
+    close = spy_closes[entry_idx]
     if close > sma_50 > sma_200:
-        return "BULL"
+        return "bull"
     if close < sma_50 < sma_200:
-        return "BEAR"
-    return "CHOP"
+        return "bear"
+    return "chop"
+
+
+def _vix_state(
+    vix_closes: Sequence[float],
+    entry_idx: int,
+    config: ClassifyConfig,
+    vix3m_closes: Sequence[float] | None = None,
+) -> Literal["high", "low", "normal", "panic"]:
+    if vix3m_closes is not None and entry_idx < len(vix3m_closes):
+        ratio = vix_closes[entry_idx] / vix3m_closes[entry_idx]
+        if ratio > config.regime_backwardation_threshold:
+            return "panic"
+    log_vix = [math.log(v) if v > 0 else 0.0 for v in vix_closes]
+    z = zscore(log_vix, config.regime_vix_zscore_lookback)[entry_idx]
+    if z > config.regime_vix_zscore_high:
+        return "high"
+    if z < config.regime_vix_zscore_low:
+        return "low"
+    return "normal"
+
+
+def market_regime(
+    spy_closes: Sequence[float],
+    spy_idx: int,
+    vix_closes: Sequence[float] | None = None,
+    vix_idx: int | None = None,
+    vix3m_closes: Sequence[float] | None = None,
+    config: ClassifyConfig = DEFAULT_CONFIG,
+) -> Regime:
+    if vix_closes is not None and vix_idx is not None:
+        vol = _vix_state(vix_closes, vix_idx, config, vix3m_closes)
+        if vol == "panic":
+            return "PANIC"
+    else:
+        vol = "normal"
+
+    trend = _spy_trend(spy_closes, spy_idx)
+    if trend == "chop":
+        return "CHOP"
+    if trend == "bull":
+        return "STRESS" if vol == "high" else "BULL"
+    return "BEAR" if vol == "high" else "COMPLACENT"

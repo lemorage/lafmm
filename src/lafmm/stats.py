@@ -51,6 +51,9 @@ def render_stats(data: dict, console: Console | None = None) -> None:
     if data.get("genome"):
         con.print()
         _render_genome(data, con)
+    if data.get("regime"):
+        con.print()
+        _render_regime(data, con)
     con.print()
 
 
@@ -403,6 +406,80 @@ def _behavior(data: dict, con: Console) -> None:
 
 # ── Trade Genome ───────────────────────────────────────────────────
 
+REGIME_LABELS: dict[str, str] = {
+    "BULL": "Bull",
+    "STRESS": "Stress",
+    "COMPLACENT": "Complacent",
+    "BEAR": "Bear",
+    "CHOP": "Chop",
+    "PANIC": "Panic",
+    "?": "Unknown",
+}
+
+REGIME_COLORS: dict[str, str] = {
+    "BULL": "green",
+    "STRESS": "yellow",
+    "COMPLACENT": "red",
+    "BEAR": "red",
+    "CHOP": "dim",
+    "PANIC": "bold red",
+    "?": "dim",
+}
+
+REGIME_ORDER: tuple[str, ...] = ("BULL", "STRESS", "CHOP", "COMPLACENT", "BEAR", "PANIC", "?")
+
+
+def _render_regime(data: dict, con: Console) -> None:
+    buckets = data.get("regime", [])
+    if not buckets:
+        return
+
+    def _regime_rank(bucket: dict) -> int:
+        regime = bucket["label"]
+        return REGIME_ORDER.index(regime) if regime in REGIME_ORDER else 99
+
+    ordered = sorted(buckets, key=_regime_rank)
+
+    total = sum(b["trades"] for b in ordered)
+    bar_width = max(40, con.width - 12)
+    bar_parts: list[str] = []
+    for bucket in ordered:
+        width = max(1, round(bucket["trades"] / total * bar_width))
+        color = REGIME_COLORS.get(bucket["label"], "dim")
+        bar_parts.append(f"[{color}]{'█' * width}[/]")
+
+    legend = Table(box=None, show_header=False, padding=(0, 1), pad_edge=False)
+    legend.add_column(no_wrap=True, min_width=4)
+    legend.add_column(style="bold", no_wrap=True, min_width=12)
+    legend.add_column(justify="right", min_width=4)
+    legend.add_column(justify="right", min_width=5)
+    legend.add_column(justify="right", min_width=8)
+    for bucket in ordered:
+        regime = bucket["label"]
+        color = REGIME_COLORS.get(regime, "dim")
+        label = REGIME_LABELS.get(regime, regime)
+        win_rate = bucket["win_rate"]
+        legend.add_row(
+            f"  [{color}]■[/]",
+            label,
+            str(bucket["trades"]),
+            f"[{_win_rate_color(win_rate)}]{win_rate:.0f}%[/]",
+            _pnl(bucket["pnl"]),
+        )
+
+    con.print(
+        Panel(
+            Group(
+                Text.from_markup(f"  {''.join(bar_parts)}"),
+                legend,
+            ),
+            title="[bold]Market Regime[/]",
+            border_style="blue",
+            padding=(1, 2),
+        )
+    )
+
+
 GENOME_LABELS: dict[str, str] = {
     "W": "With-trend",
     "N": "Neutral",
@@ -452,9 +529,9 @@ def _aggregate_axis(
         trades = wins = 0
         pnl = 0.0
         for bucket in buckets:
-            if bucket["code"] == "?":
+            if bucket["label"] == "?":
                 continue
-            parts = bucket["code"].split("-")
+            parts = bucket["label"].split("-")
             if len(parts) > axis_idx and parts[axis_idx] == code_letter:
                 trades += bucket["trades"]
                 wins += bucket["wins"]
@@ -503,7 +580,7 @@ def _render_axis_legend(
 
 
 def _render_genome_row(table: Table, bucket: dict) -> None:
-    code = bucket["code"]
+    code = bucket["label"]
     win_rate = bucket["win_rate"]
     color = _win_rate_color(win_rate)
     parts = code.split("-")
@@ -528,7 +605,7 @@ def _make_edge_leak_table() -> Table:
 
 
 def _render_edge_and_leak(buckets: Sequence[dict]) -> tuple[Table, Table]:
-    classified = [b for b in buckets if b["code"] != "?"]
+    classified = [b for b in buckets if b["label"] != "?"]
     winners = sorted([b for b in classified if b["pnl"] > 0], key=lambda b: -b["pnl"])
     losers = sorted([b for b in classified if b["pnl"] < 0], key=lambda b: b["pnl"])
 

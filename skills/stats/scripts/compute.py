@@ -111,8 +111,8 @@ class Robustness:
 
 
 @dataclass(frozen=True, slots=True)
-class GenomeBucket:
-    code: str
+class LabelBucket:
+    label: str
     trades: int
     wins: int
     losses: int
@@ -177,7 +177,8 @@ class Stats:
     monthly_pnl: tuple[MonthPnl, ...] = ()
     rolling: tuple[RollingPoint, ...] = ()
     robustness: tuple[Robustness, ...] = ()
-    genome: tuple[GenomeBucket, ...] = ()
+    genome: tuple[LabelBucket, ...] = ()
+    regime: tuple[LabelBucket, ...] = ()
     spy_return_pct: float | None = None
 
 
@@ -467,6 +468,7 @@ def compute(
         rolling=_rolling(positions),
         robustness=_robustness(positions),
         genome=_classify_positions(positions, data_dir),
+        regime=_classify_regime(positions, data_dir),
         spy_return_pct=_benchmark(benchmark_dir, first, last) if benchmark_dir else None,
     )
 
@@ -885,42 +887,110 @@ def _classify_position(position: Position, data_dir: Path) -> str:
     return genome.code
 
 
-def _build_genome_buckets(
-    by_code: dict[str, list[Position]],
-) -> tuple[GenomeBucket, ...]:
+def _build_buckets(
+    by_label: dict[str, list[Position]],
+) -> tuple[LabelBucket, ...]:
     ranked = sorted(
-        by_code.items(),
+        by_label.items(),
         key=lambda x: -abs(sum(p.pnl for p in x[1])),
     )
-    buckets: list[GenomeBucket] = []
-    for code, code_positions in ranked:
-        wins = sum(1 for p in code_positions if p.pnl > 0)
-        losses = sum(1 for p in code_positions if p.pnl < 0)
-        count = len(code_positions)
-        buckets.append(
-            GenomeBucket(
-                code=code,
-                trades=count,
-                wins=wins,
-                losses=losses,
-                pnl=round(sum(p.pnl for p in code_positions), 2),
-                win_rate=round(wins / count * 100, 1) if count else 0.0,
+    return tuple(
+        LabelBucket(
+            label=label,
+            trades=len(positions),
+            wins=sum(1 for p in positions if p.pnl > 0),
+            losses=sum(1 for p in positions if p.pnl < 0),
+            pnl=round(sum(p.pnl for p in positions), 2),
+            win_rate=round(
+                sum(1 for p in positions if p.pnl > 0) / len(positions) * 100,
+                1,
             )
+            if positions
+            else 0.0,
         )
-    return tuple(buckets)
+        for label, positions in ranked
+    )
 
 
 def _classify_positions(
     positions: Sequence[Position],
     data_dir: Path | None,
-) -> tuple[GenomeBucket, ...]:
+) -> tuple[LabelBucket, ...]:
     if not data_dir or not data_dir.exists():
         return ()
-    by_code: dict[str, list[Position]] = defaultdict(list)
+    by_label: dict[str, list[Position]] = defaultdict(list)
     for position in positions:
         code = _classify_position(position, data_dir)
-        by_code[code].append(position)
-    return _build_genome_buckets(by_code)
+        by_label[code].append(position)
+    return _build_buckets(by_label)
+
+
+def _load_ref_series(
+    data_dir: Path,
+    name: str,
+) -> tuple[tuple[str, ...], tuple[float, ...]] | None:
+    from lafmm.loader import load_price_series
+
+    for group_dir in sorted(data_dir.iterdir()):
+        ref_dir = group_dir / "_ref" / name
+        if ref_dir.is_dir():
+            series = load_price_series(ref_dir)
+            if series is not None:
+                return series.dates, series.close
+    return None
+
+
+def _regime_for_position(
+    position: Position,
+    spy_date_index: dict[str, int],
+    spy_closes: tuple[float, ...],
+    vix_closes: tuple[float, ...] | None,
+    vix_date_index: dict[str, int],
+    vix3m_closes: tuple[float, ...] | None,
+) -> str:
+    from lafmm.classify import market_regime
+
+    if position.open_date not in spy_date_index:
+        return "?"
+    spy_idx = spy_date_index[position.open_date]
+    vix_idx = vix_date_index.get(position.open_date)
+    return market_regime(spy_closes, spy_idx, vix_closes, vix_idx, vix3m_closes)
+
+
+def _classify_regime(
+    positions: Sequence[Position],
+    data_dir: Path | None,
+) -> tuple[LabelBucket, ...]:
+    if not data_dir or not data_dir.exists():
+        return ()
+
+    from lafmm.fetch import find_ticker_dir
+    from lafmm.loader import load_price_series
+
+    spy_dir = find_ticker_dir(data_dir, "SPY")
+    if spy_dir is None:
+        return ()
+    spy = load_price_series(spy_dir)
+    if spy is None:
+        return ()
+
+    spy_date_index = {d: i for i, d in enumerate(spy.dates)}
+    vix_data = _load_ref_series(data_dir, "VIX")
+    vix3m_data = _load_ref_series(data_dir, "VIX3M")
+    vix_date_index = {d: i for i, d in enumerate(vix_data[0])} if vix_data else {}
+
+    by_label: dict[str, list[Position]] = defaultdict(list)
+    for position in positions:
+        regime = _regime_for_position(
+            position,
+            spy_date_index,
+            spy.close,
+            vix_data[1] if vix_data else None,
+            vix_date_index,
+            vix3m_data[1] if vix3m_data else None,
+        )
+        by_label[regime].append(position)
+    return _build_buckets(by_label)
 
 
 def _benchmark(price_dir: Path, start: str, end: str) -> float | None:
