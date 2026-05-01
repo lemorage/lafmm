@@ -1,16 +1,13 @@
 ---
 name: detect-regime
 description: >
-  Detect whether a sector is trending, mean-reverting, or random using
-  the Hurst exponent and variance ratio test. Use this skill when the
-  user asks "is this a good time for trend following?", "what regime is
-  the market in?", "should I trust the signals right now?", "is this
-  sector trending?", or any variation about market regime or whether
-  the Livermore system is suitable for current conditions. Also use it
-  proactively when signals seem noisy or contradictory, when
+  Use when the user asks "is this a good time for trend following?",
+  "what regime is the market in?", "should I trust the signals right
+  now?", "is this sector trending?", or any variation about market
+  regime or whether the Livermore system suits current conditions. Also
+  use proactively when signals seem noisy or contradictory, when
   tune-thresholds suggests extreme values, or before building a new
-  watchlist group to assess whether the sector's price action favors
-  trend-following.
+  watchlist group to assess whether the sector favors trend-following.
 ---
 
 # Detect Regime
