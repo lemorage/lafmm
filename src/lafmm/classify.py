@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
-import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from lafmm.indicators import relative_volume, rsi, sma, zscore
+from lafmm.indicators import relative_volume, rsi, sma
 
 type Trend = Literal["W", "N", "A"]
 type Cadence = Literal["F", "S", "P"]
 type Setup = Literal["B", "K", "R"]
 type VolumeConfirm = Literal["C", "U"]
-type Regime = Literal["BULL", "STRESS", "COMPLACENT", "BEAR", "CHOP", "PANIC"]
+type Regime = Literal["RISK_ON", "RISK_OFF"]
 type Side = Literal["long", "short"]
+
+BACKWARDATION_THRESHOLD = 1.10
+PANIC_CONFIRM_DAYS = 7
+PANIC_EXIT_DAYS = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,10 +29,6 @@ class ClassifyConfig:
     reversal_proximity_pct: float = 5.0
     reversal_rsi: float = 30.0
     volume_threshold: float = 1.4
-    regime_vix_zscore_lookback: int = 60
-    regime_vix_zscore_high: float = 1.5
-    regime_vix_zscore_low: float = -1.0
-    regime_backwardation_threshold: float = 1.05
 
 
 DEFAULT_CONFIG = ClassifyConfig()
@@ -164,57 +163,42 @@ def classify_trade(
     return classify(snapshot, config)
 
 
-def _spy_trend(
-    spy_closes: Sequence[float],
-    entry_idx: int,
-) -> Literal["bull", "bear", "chop"]:
-    sma_50 = sma(spy_closes, 50)[entry_idx]
-    sma_200 = sma(spy_closes, 200)[entry_idx]
-    close = spy_closes[entry_idx]
-    if close > sma_50 > sma_200:
-        return "bull"
-    if close < sma_50 < sma_200:
-        return "bear"
-    return "chop"
-
-
-def _vix_state(
+def compute_regime_series(
     vix_closes: Sequence[float],
-    entry_idx: int,
-    config: ClassifyConfig,
-    vix3m_closes: Sequence[float] | None = None,
-) -> Literal["high", "low", "normal", "panic"]:
-    if vix3m_closes is not None and entry_idx < len(vix3m_closes):
-        ratio = vix_closes[entry_idx] / vix3m_closes[entry_idx]
-        if ratio > config.regime_backwardation_threshold:
-            return "panic"
-    log_vix = [math.log(v) if v > 0 else 0.0 for v in vix_closes]
-    z = zscore(log_vix, config.regime_vix_zscore_lookback)[entry_idx]
-    if z > config.regime_vix_zscore_high:
-        return "high"
-    if z < config.regime_vix_zscore_low:
-        return "low"
-    return "normal"
+    vix_dates: Sequence[str],
+    vix3m_closes: Sequence[float],
+    vix3m_dates: Sequence[str],
+) -> dict[str, Regime]:
+    vix3m_by_date = dict(zip(vix3m_dates, range(len(vix3m_dates)), strict=False))
+    current: Regime = "RISK_ON"
+    entry_streak = 0
+    exit_streak = 0
+    result: dict[str, Regime] = {}
 
+    for i, date in enumerate(vix_dates):
+        v3i = vix3m_by_date.get(date)
+        is_backwardation = False
+        if v3i is not None and vix3m_closes[v3i] > 0:
+            is_backwardation = vix_closes[i] / vix3m_closes[v3i] > BACKWARDATION_THRESHOLD
 
-def market_regime(
-    spy_closes: Sequence[float],
-    spy_idx: int,
-    vix_closes: Sequence[float] | None = None,
-    vix_idx: int | None = None,
-    vix3m_closes: Sequence[float] | None = None,
-    config: ClassifyConfig = DEFAULT_CONFIG,
-) -> Regime:
-    if vix_closes is not None and vix_idx is not None:
-        vol = _vix_state(vix_closes, vix_idx, config, vix3m_closes)
-        if vol == "panic":
-            return "PANIC"
-    else:
-        vol = "normal"
+        if current == "RISK_OFF":
+            if not is_backwardation:
+                exit_streak += 1
+            else:
+                exit_streak = 0
+            if exit_streak >= PANIC_EXIT_DAYS:
+                current = "RISK_ON"
+                entry_streak = 0
+                exit_streak = 0
+        else:
+            exit_streak = 0
+            if is_backwardation:
+                entry_streak += 1
+            else:
+                entry_streak = 0
+            if entry_streak >= PANIC_CONFIRM_DAYS:
+                current = "RISK_OFF"
 
-    trend = _spy_trend(spy_closes, spy_idx)
-    if trend == "chop":
-        return "CHOP"
-    if trend == "bull":
-        return "STRESS" if vol == "high" else "BULL"
-    return "BEAR" if vol == "high" else "COMPLACENT"
+        result[date] = current
+
+    return result

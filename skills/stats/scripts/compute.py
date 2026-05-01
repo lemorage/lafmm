@@ -940,23 +940,6 @@ def _load_ref_series(
     return None
 
 
-def _regime_for_position(
-    position: Position,
-    spy_date_index: dict[str, int],
-    spy_closes: tuple[float, ...],
-    vix_closes: tuple[float, ...] | None,
-    vix_date_index: dict[str, int],
-    vix3m_closes: tuple[float, ...] | None,
-) -> str:
-    from lafmm.classify import market_regime
-
-    if position.open_date not in spy_date_index:
-        return "?"
-    spy_idx = spy_date_index[position.open_date]
-    vix_idx = vix_date_index.get(position.open_date)
-    return market_regime(spy_closes, spy_idx, vix_closes, vix_idx, vix3m_closes)
-
-
 def _classify_regime(
     positions: Sequence[Position],
     data_dir: Path | None,
@@ -964,31 +947,23 @@ def _classify_regime(
     if not data_dir or not data_dir.exists():
         return ()
 
-    from lafmm.fetch import find_ticker_dir
-    from lafmm.loader import load_price_series
+    from lafmm.classify import compute_regime_series
 
-    spy_dir = find_ticker_dir(data_dir, "SPY")
-    if spy_dir is None:
-        return ()
-    spy = load_price_series(spy_dir)
-    if spy is None:
-        return ()
-
-    spy_date_index = {d: i for i, d in enumerate(spy.dates)}
     vix_data = _load_ref_series(data_dir, "VIX")
     vix3m_data = _load_ref_series(data_dir, "VIX3M")
-    vix_date_index = {d: i for i, d in enumerate(vix_data[0])} if vix_data else {}
+    if not vix_data or not vix3m_data:
+        return ()
+
+    regime_map = compute_regime_series(
+        vix_data[1],
+        vix_data[0],
+        vix3m_data[1],
+        vix3m_data[0],
+    )
 
     by_label: dict[str, list[Position]] = defaultdict(list)
     for position in positions:
-        regime = _regime_for_position(
-            position,
-            spy_date_index,
-            spy.close,
-            vix_data[1] if vix_data else None,
-            vix_date_index,
-            vix3m_data[1] if vix3m_data else None,
-        )
+        regime = regime_map.get(position.open_date, "?")
         by_label[regime].append(position)
     return _build_buckets(by_label)
 

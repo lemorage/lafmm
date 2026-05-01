@@ -1,5 +1,11 @@
 from lafmm.app import LafmmApp
-from lafmm.classify import ClassifyConfig, Snapshot, TradeGenome, classify_trade, market_regime
+from lafmm.classify import (
+    ClassifyConfig,
+    Snapshot,
+    TradeGenome,
+    classify_trade,
+    compute_regime_series,
+)
 from lafmm.engine import process, start
 from lafmm.group import (
     group_leaders,
@@ -45,6 +51,7 @@ __all__ = [
     "StockState",
     "TradeGenome",
     "classify_trade",
+    "compute_regime_series",
     "group_leaders",
     "group_tracked",
     "group_trend",
@@ -53,7 +60,6 @@ __all__ = [
     "load_group_config",
     "load_market",
     "load_price_series",
-    "market_regime",
     "market_trend",
     "process",
     "process_group",

@@ -407,26 +407,18 @@ def _behavior(data: dict, con: Console) -> None:
 # ── Trade Genome ───────────────────────────────────────────────────
 
 REGIME_LABELS: dict[str, str] = {
-    "BULL": "Bull",
-    "STRESS": "Stress",
-    "COMPLACENT": "Complacent",
-    "BEAR": "Bear",
-    "CHOP": "Chop",
-    "PANIC": "Panic",
+    "RISK_ON": "Risk-on",
+    "RISK_OFF": "Risk-off",
     "?": "Unknown",
 }
 
 REGIME_COLORS: dict[str, str] = {
-    "BULL": "green",
-    "STRESS": "yellow",
-    "COMPLACENT": "red",
-    "BEAR": "red",
-    "CHOP": "dim",
-    "PANIC": "bold red",
+    "RISK_ON": "green",
+    "RISK_OFF": "red",
     "?": "dim",
 }
 
-REGIME_ORDER: tuple[str, ...] = ("BULL", "STRESS", "CHOP", "COMPLACENT", "BEAR", "PANIC", "?")
+REGIME_ORDER: tuple[str, ...] = ("RISK_ON", "RISK_OFF", "?")
 
 
 def _render_regime(data: dict, con: Console) -> None:

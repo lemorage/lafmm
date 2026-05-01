@@ -89,8 +89,12 @@ Omit it when showing the user their stats.
     {"excluded": "TSLA", "reason": "worst", "round_trips": 43, "wins": 30, "losses": 13, "win_rate": 69.8, "expectancy": 45.00, "profit_factor": 2.10}
   ],
   "genome": [
-    {"code": "N-S-K-U", "trades": 9, "wins": 8, "losses": 1, "pnl": 1201.21, "win_rate": 88.9},
-    {"code": "W-S-K-U", "trades": 6, "wins": 3, "losses": 3, "pnl": -827.30, "win_rate": 50.0}
+    {"label": "N-S-K-U", "trades": 9, "wins": 8, "losses": 1, "pnl": 1201.21, "win_rate": 88.9},
+    {"label": "W-S-K-U", "trades": 6, "wins": 3, "losses": 3, "pnl": -827.30, "win_rate": 50.0}
+  ],
+  "regime": [
+    {"label": "RISK_ON", "trades": 32, "wins": 22, "losses": 10, "pnl": 3200.00, "win_rate": 68.8},
+    {"label": "RISK_OFF", "trades": 6, "wins": 4, "losses": 2, "pnl": 520.78, "win_rate": 66.7}
   ],
   "spy_return_pct": 8.5
 }
@@ -117,6 +121,7 @@ Key fields for analysis:
   - Example: `W-S-B-C` = With-trend Swing Breakout Confirmed. `?` = no OHLCV data for that ticker
   - Edge = top 3 by P&L (your strengths). Leak = bottom 3 by P&L (your weaknesses)
   - Populated automatically when `data/` exists in the workspace. Empty if no OHLCV data available
+- `regime`: market regime at trade entry. 2-state: RISK_ON (default) / RISK_OFF (VIX/VIX3M > 1.10 for 7 consecutive days). Based on VIX term structure inversion, the only regime signal that survived OOS validation on 20 years of data. Requires VIX and VIX3M data in `data/us-indices/_ref/`
 - `spy_return_pct`: benchmark, null if SPY data unavailable
 
 ## What it computes
