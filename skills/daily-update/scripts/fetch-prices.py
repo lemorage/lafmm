@@ -68,7 +68,10 @@ def append_bars_flat(csv_path: Path, bars: Sequence[Bar]) -> int:
 def resolve_target(ticker: str, explicit: Path | None) -> Path:
     if explicit is not None:
         return explicit
-    data_dir = Path.home() / ".lafmm" / "data"
+    from lafmm.init import HUMAN_DATA, get_root
+
+    root = get_root()
+    data_dir = root / HUMAN_DATA if root else Path.home() / ".lafmm" / "data"
     if data_dir.exists():
         found = find_ticker_dir(data_dir, ticker)
         if found is not None:

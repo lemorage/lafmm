@@ -116,7 +116,10 @@ def _resolve_api_key() -> str:
     key = os.environ.get("FINNHUB_API_KEY")
     if key:
         return key
-    config = Path.home() / ".lafmm" / "config.toml"
+    from lafmm.init import get_root
+
+    root = get_root()
+    config = (root if root else Path.home() / ".lafmm") / "config.toml"
     if config.exists():
         import tomllib
 
