@@ -14,6 +14,7 @@ from lafmm.quant.types import Bar
 
 HEADER = ("date", "open", "high", "low", "close", "volume")
 TRADING_TO_CALENDAR = 1.5
+MIN_BARS = 250
 
 
 # ── Fetch ──────────────────────────────────────────────────────────
@@ -162,14 +163,14 @@ def _ref_dir(data_dir: Path) -> Path:
 
 def ensure_regime_data(
     data_dir: Path,
-    min_bars: int = 250,
-) -> list[str]:
+    min_bars: int = MIN_BARS,
+) -> list[tuple[str, int]]:
     ref = _ref_dir(data_dir)
     end = date.today() + timedelta(days=1)
     calendar_days = int(min_bars * TRADING_TO_CALENDAR)
     start = end - timedelta(days=calendar_days)
 
-    updated: list[str] = []
+    updated: list[tuple[str, int]] = []
     for yahoo_ticker, local_name in REGIME_TICKERS.items():
         ticker_dir = ref / local_name
         existing = read_existing_dates(ticker_dir)
@@ -184,15 +185,15 @@ def ensure_regime_data(
             continue
         added = write_bars(ticker_dir, new_bars)
         if added > 0:
-            updated.append(local_name)
+            updated.append((local_name, len(existing) + added))
     return updated
 
 
 def ensure_history(
     account_dir: Path,
     data_dir: Path,
-    min_bars: int = 250,
-) -> list[str]:
+    min_bars: int = MIN_BARS,
+) -> list[tuple[str, int]]:
     traded = _traded_symbols(account_dir)
     if not traded:
         return []
@@ -201,7 +202,7 @@ def ensure_history(
     calendar_days = int(min_bars * TRADING_TO_CALENDAR)
     start = end - timedelta(days=calendar_days)
 
-    updated: list[str] = []
+    updated: list[tuple[str, int]] = []
     for symbol in sorted(traded):
         ticker_dir = find_ticker_dir(data_dir, symbol)
         if ticker_dir is None:
@@ -222,6 +223,6 @@ def ensure_history(
 
         added = write_bars(ticker_dir, new_bars)
         if added > 0:
-            updated.append(symbol)
+            updated.append((symbol, len(existing) + added))
 
     return updated
