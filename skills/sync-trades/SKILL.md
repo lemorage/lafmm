@@ -113,9 +113,16 @@ The engine and stats need price history for every traded symbol.
 After every import, check if any traded ticker is not in any tracked
 group (`data/{group}/{TICKER}/`). For each untracked ticker:
 
-1. Look it up. Run `yf.Ticker(symbol).info` to get `quoteType`,
-   `sector`, `industry`, and `longName`. If Yahoo fails, web search
-   "what is {TICKER} stock" instead. Do not guess from training data.
+1. Look it up:
+   ```bash
+   uv run .claude/skills/sync-trades/scripts/ticker_meta.py NVDA
+   ```
+   Output: `NVDA   Technology / Semiconductors (EQUITY)`
+
+   Use `--json` for structured output. Results are cached to
+   `data/_meta/{TICKER}.json` automatically. If the script fails
+   (no yfinance data), web search "what is {TICKER} stock" instead.
+   Do not guess from training data.
 
 2. Decide placement:
    - **Leveraged/inverse ETF** (`quoteType: ETF` and name contains

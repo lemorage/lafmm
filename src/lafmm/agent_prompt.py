@@ -99,9 +99,14 @@ Your working directory is `~/.lafmm/`. All paths below are relative to it.
 │   │   ├── QQQ/2026.csv
 │   │   ├── DIA/2026.csv        # tracked
 │   │   └── IWM/2026.csv
-│   └── {group}/                # sector groups added by user or build-watchlist skill
-│       ├── group.toml
-│       └── {TICKER}/{YEAR}.csv
+│   ├── {group}/                # sector groups added by user or build-watchlist skill
+│   │   ├── group.toml
+│   │   ├── {TICKER}/{YEAR}.csv
+│   │   └── _ref/               # reference data (VIX, VIX3M) not engine-processed
+│   ├── _adhoc/                 # tickers that don't fit any current sector group
+│   │   └── {TICKER}/{YEAR}.csv
+│   └── _meta/                  # cached yfinance metadata (sector, beta, market cap)
+│       └── {TICKER}.json       # identity (permanent) + snapshot (refreshed after 30d)
 ├── config.toml                 # workspace-wide settings (API keys, preferences)
 ├── profile.md                  # who the human is
 ├── insights/                   # agent's observations about the human
