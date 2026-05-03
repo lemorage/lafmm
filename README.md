@@ -1,6 +1,12 @@
+<p align="center">
+  <img src="lafmm.png" width="280" alt="LAFMM">
+</p>
+
 # LAFMM
 
-**Livermore's Anticipating Future Movements Map** — Jesse Livermore's six-column price recording system from *How to Trade in Stocks* (1940), implemented as an interactive terminal tool and agent workspace.
+Jesse Livermore's six-column price recording system from *How to Trade in Stocks* (1940), run by an AI agent in your terminal.
+
+You talk to the agent. It fetches prices, runs the engine, surfaces signals, imports your trades, and learns your patterns over time. The TUI and CLI are views into what the agent maintains.
 
 ## Install
 
@@ -13,55 +19,44 @@ uv tool install -e .
 lafmm
 ```
 
-Global install puts `lafmm` on PATH, including `~/.lafmm/` where agents operate. Without it, use `uv run lafmm` from the project directory.
-
-First run scaffolds `~/.lafmm/`, fetches US index prices (SPY, QQQ, DIA, IWM), and launches [Claude Code](https://claude.ai/download) (v2.1.59+). Subsequent runs open the interactive TUI.
+First run scaffolds `~/.lafmm/`, fetches US index prices, and launches [Claude Code](https://claude.ai/download) — the agent interface. Subsequent runs open the TUI.
 
 ```bash
-lafmm                          # TUI (default)
+lafmm                          # interactive market map
+lafmm chart macd NVDA          # terminal charts
+lafmm chart candle SPY -p 30d
 lafmm stats                    # trading performance
-lafmm stats --period 2026-Q1   # filtered by period
+lafmm stats --period 2026-Q1
 lafmm sync                     # regenerate cache from data
-lafmm chart macd NVDA          # terminal charts (13 types)
-lafmm chart candle SPY -p 30d  # candlestick, last 30 days
-lafmm tape today "bought NVDA" # record a trading thought
-lafmm tape                     # list pending tapes
+lafmm tape today "bought NVDA" # trade thoughts
 ```
 
 ## The System
 
-Two leaders per industry group. Each gets a 6-column sheet. Their combined price (Key Price) gets a third. 18 columns total.
+Two leaders per industry group. Each gets a 6-column sheet. Their combined price (Key Price) gets a third.
 
 ```
 | Leader A (6 cols) | Leader B (6 cols) | Key Price (6 cols) |
 ```
 
-The engine records closing prices into six columns based on movement — only Upward Trend (green) and Downward Trend (red) use ink. The rest are pencil: tentative. Pivotal points mark where trends are decided. Signals fire when price confirms or fails at those points.
-
-Group trend comes from Key Price, not individual stocks. Market trend = majority of groups agreeing.
+Only Upward Trend and Downward Trend use ink. The rest are pencil: tentative. Signals fire when price confirms or fails at pivotal points. Group trend = Key Price. Market trend = majority of groups.
 
 > *"There is danger of being caught in a false movement by depending upon only one stock."*
 
 ## Workspace
 
+Everything is files. The agent reads and writes them. So can you.
+
 ```
 ~/.lafmm/
-├── data/                       # OHLCV price data (TOML + CSV)
-│   └── {group}/{TICKER}/{YEAR}.csv
-├── cache/                      # computed Livermore state (markdown)
-├── config.toml                 # workspace settings (API keys, preferences)
-├── profile.md                  # who you are as a trader
-├── accounts/                   # broker configs + trade journals
-│   └── {name}/                 # one folder per trading account
-│       ├── account.toml        # broker, type, instruments, fees
-│       ├── capital/            # daily account value (NAV)
-│       └── journal/            # trade logs + observations
-├── insights/                   # agent's observations about you
-├── memory/                     # Claude Code auto-memory
-└── .claude/skills/             # auto-discovered by Claude Code
+├── data/              # OHLCV prices
+├── cache/             # computed engine state
+├── accounts/          # broker configs, journals, NAV
+├── profile.md         # risk tolerance, biases, rules
+├── insights/          # agent observations over time
+├── config.toml        # API keys
+└── .claude/skills/    # what the agent can do
 ```
-
-Add a sector: create a folder in `data/` with `group.toml` (leaders + thresholds) and ticker directories. The agent handles fetching, syncing, and analysis via skills.
 
 ## License
 
