@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.0
+
+- new skill: qualify with three-perspective entry analysis (momentum breakout, range, oversold bounce)
+- new skill: earnings-calendar with event-based cache and calendar view
+- new skill: factor-exposure with OLS regression and rolling alpha/beta
+- new skill: position-size with half-Kelly sizing and Monte Carlo drawdown
+- new skill: validate-signal with permutation tests and hit rate analysis
+- new subcommand: `lafmm tape` for recording trading thoughts at trade time
+- new: ticker metadata cache with two-tier staleness
+- new: market regime classification with VIX z-score and term structure
+- refactor: simplify market regime to 2-state RISK_ON/RISK_OFF after OOS validation
+- refactor: unify color palette into single colors.py module
+- fix: use `get_root()` for path resolution in skill scripts
+- fix: auto-place untracked tickers after trade import
+- docs: rewrite README with agent-first framing and project logo
+- chore: scaffold with 2 years of history for SMA 200 warmup
+
 ## 0.5.0
 
 - new: trade genome classification (4-axis type codes: Trend/Setup/Cadence/Volume)

@@ -5,7 +5,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-VERSION = "0.5.0"
+VERSION = "0.6.0"
 LAFMM_DIR = ".lafmm"
 HUMAN_DATA = "data"
 AGENT_DATA = "cache"
