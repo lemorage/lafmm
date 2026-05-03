@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.12"
-# dependencies = ["yfinance"]
-# ///
 """Fetch daily OHLCV prices and append to LAFMM CSV files.
 
 Usage:

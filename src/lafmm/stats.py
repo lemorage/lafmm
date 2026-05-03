@@ -17,6 +17,12 @@ from rich.table import Table
 from rich.text import Text
 
 from lafmm.chart import sparkline, vertical_bars
+from lafmm.colors import (
+    NEGATIVE,
+    POSITIVE,
+    ROTATION_RICH,
+    color_by_threshold,
+)
 
 MONTH_NAMES = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
@@ -298,9 +304,7 @@ WIN_RATE_NEUTRAL = 50
 
 
 def _win_rate_color(rate: float) -> str:
-    if rate >= WIN_RATE_GOOD:
-        return "green"
-    return "yellow" if rate >= WIN_RATE_NEUTRAL else "red"
+    return color_by_threshold(rate, good=WIN_RATE_GOOD, neutral=WIN_RATE_NEUTRAL)
 
 
 # ── Top symbols ─────────────────────────────────────────────────────
@@ -413,8 +417,8 @@ REGIME_LABELS: dict[str, str] = {
 }
 
 REGIME_COLORS: dict[str, str] = {
-    "RISK_ON": "green",
-    "RISK_OFF": "red",
+    "RISK_ON": POSITIVE,
+    "RISK_OFF": NEGATIVE,
     "?": "dim",
 }
 
@@ -493,7 +497,7 @@ GENOME_AXES: tuple[tuple[str, int, tuple[str, ...]], ...] = (
     ("Volume", 3, ("C", "U")),
 )
 
-GENOME_COLORS: tuple[str, ...] = ("cyan", "magenta", "yellow", "green", "blue")
+GENOME_COLORS = ROTATION_RICH
 
 EDGE_LEAK_COUNT = 3
 
@@ -636,10 +640,10 @@ def _render_genome(data: dict, con: Console) -> None:
 
     parts = _build_axis_parts(buckets, max(40, con.width - 12))
     edge, leak = _render_edge_and_leak(buckets)
-    parts.append(Text.from_markup("  [bold green]Edge[/]"))
+    parts.append(Text.from_markup(f"  [bold {POSITIVE}]Edge[/]"))
     parts.append(edge)
     parts.append(Text(""))
-    parts.append(Text.from_markup("  [bold red]Leak[/]"))
+    parts.append(Text.from_markup(f"  [bold {NEGATIVE}]Leak[/]"))
     parts.append(leak)
 
     con.print(
@@ -651,24 +655,22 @@ def _render_genome(data: dict, con: Console) -> None:
 
 
 def _pf_color(profit_factor: float) -> str:
-    if profit_factor >= 1.5:
-        return "green"
-    return "yellow" if profit_factor >= 1.0 else "red"
+    return color_by_threshold(profit_factor, good=1.5, neutral=1.0)
 
 
 def _pnl(v: float) -> str:
     if v > 0:
-        return f"[green]+${v:,.2f}[/]"
+        return f"[{POSITIVE}]+${v:,.2f}[/]"
     if v < 0:
-        return f"[red]-${abs(v):,.2f}[/]"
+        return f"[{NEGATIVE}]-${abs(v):,.2f}[/]"
     return "$0.00"
 
 
 def _pct(v: float) -> str:
     if v > 0:
-        return f"[green]+{v:.1f}%[/]"
+        return f"[{POSITIVE}]+{v:.1f}%[/]"
     if v < 0:
-        return f"[red]{v:.1f}%[/]"
+        return f"[{NEGATIVE}]{v:.1f}%[/]"
     return "0.0%"
 
 

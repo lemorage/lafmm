@@ -10,6 +10,7 @@ from lafmm.chart.styles import (
     HistogramSeries,
     LineSeries,
 )
+from lafmm.colors import ROTATION_ANSI
 from lafmm.indicators import (
     adx,
     bollinger,
@@ -160,7 +161,7 @@ def overlay_chart(
     title: str = "",
     x_labels: Sequence[str] = (),
 ) -> str:
-    colors = ("yellow", "cyan", "magenta", "bright_green", "bright_red")
+    colors = ROTATION_ANSI
     series_list: list[LineSeries] = [LineSeries(ys=tuple(closes), color="white", label="Close")]
     ma_fns = {"sma": sma, "ema": ema, "rma": rma, "dema": dema, "tema": tema}
     for idx, (kind, period) in enumerate(overlays):

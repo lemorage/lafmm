@@ -5,6 +5,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
+from lafmm.colors import NEGATIVE, NEUTRAL, POSITIVE
 from lafmm.group import group_leaders, group_tracked, group_trend, market_trend
 from lafmm.models import (
     COL_ORDER,
@@ -21,22 +22,22 @@ from lafmm.models import (
 )
 
 INK_STYLES: dict[str, str] = {
-    "black": "bold green",
-    "red": "bold red",
+    "black": f"bold {POSITIVE}",
+    "red": f"bold {NEGATIVE}",
     "pencil": "dim",
 }
 
 SIGNAL_STYLES: dict[SignalType, tuple[str, str]] = {
-    SignalType.BUY: ("bold green", "BUY"),
-    SignalType.SELL: ("bold red", "SELL"),
-    SignalType.DANGER_UP_OVER: ("bold yellow", "DANGER: Up Over"),
-    SignalType.DANGER_DOWN_OVER: ("bold yellow", "DANGER: Dn Over"),
+    SignalType.BUY: (f"bold {POSITIVE}", "BUY"),
+    SignalType.SELL: (f"bold {NEGATIVE}", "SELL"),
+    SignalType.DANGER_UP_OVER: (f"bold {NEUTRAL}", "DANGER: Up Over"),
+    SignalType.DANGER_DOWN_OVER: (f"bold {NEUTRAL}", "DANGER: Dn Over"),
 }
 
 TREND_STYLES: dict[GroupTrend, tuple[str, str]] = {
-    "bullish": ("bold green", "BULLISH"),
-    "bearish": ("bold red", "BEARISH"),
-    "neutral": ("bold yellow", "NEUTRAL"),
+    "bullish": (f"bold {POSITIVE}", "BULLISH"),
+    "bearish": (f"bold {NEGATIVE}", "BEARISH"),
+    "neutral": (f"bold {NEUTRAL}", "NEUTRAL"),
 }
 
 

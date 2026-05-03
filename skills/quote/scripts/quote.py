@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.12"
-# dependencies = ["requests"]
-# ///
 """Fetch real-time stock quotes from Finnhub.
 
 Usage:

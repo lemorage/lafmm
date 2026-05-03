@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.12"
-# dependencies = ["yfinance"]
-# ///
 """SPDX-License-Identifier: GPL-3.0-only"""
 
 from __future__ import annotations
@@ -16,6 +12,11 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import date, timedelta
 from pathlib import Path
+
+from rich.console import Console
+from rich.text import Text
+
+from lafmm.colors import ROTATION_RICH
 
 DEFAULT_HORIZON_DAYS = 14
 _CACHE_FILENAME = "_earnings.json"
@@ -157,33 +158,20 @@ def _print_report(events: Sequence[EarningsEvent], horizon_days: int) -> None:
         print(f"         {event.earnings_date}  {days_label}")
 
 
-_COLORS: tuple[str, ...] = ("cyan", "magenta", "yellow", "green", "blue", "red")
-
-_ANSI: dict[str, str] = {
-    "cyan": "\033[36m",
-    "magenta": "\033[35m",
-    "yellow": "\033[33m",
-    "green": "\033[32m",
-    "blue": "\033[34m",
-    "red": "\033[31m",
-    "bold": "\033[1m",
-    "reset": "\033[0m",
-}
-
-
 def _print_calendar(events: Sequence[EarningsEvent]) -> None:
     if not events:
         print("No upcoming earnings.")
         return
+    con = Console()
     first_date = date.fromisoformat(events[0].earnings_date)
     year, month = first_date.year, first_date.month
     month_events = [e for e in events if date.fromisoformat(e.earnings_date).month == month]
     day_colors = _assign_day_colors(month_events)
     title = f"{calendar.month_name[month]} {year}"
-    print(f"    {title:^20}")
-    _print_month_grid(year, month, day_colors)
-    print()
-    _print_calendar_legend(month_events, day_colors)
+    con.print(f"    {title:^20}")
+    _print_month_grid(con, year, month, day_colors)
+    con.print()
+    _print_calendar_legend(con, month_events, day_colors)
 
 
 def _assign_day_colors(events: Sequence[EarningsEvent]) -> dict[int, str]:
@@ -192,42 +180,42 @@ def _assign_day_colors(events: Sequence[EarningsEvent]) -> dict[int, str]:
     for event in events:
         day = date.fromisoformat(event.earnings_date).day
         if day not in days_seen:
-            days_seen[day] = _COLORS[color_idx % len(_COLORS)]
+            days_seen[day] = ROTATION_RICH[color_idx % len(ROTATION_RICH)]
             color_idx += 1
     return days_seen
 
 
-def _print_month_grid(year: int, month: int, day_colors: dict[int, str]) -> None:
+def _print_month_grid(con: Console, year: int, month: int, day_colors: dict[int, str]) -> None:
     calendar.setfirstweekday(calendar.SUNDAY)
-    print("Su Mo Tu We Th Fr Sa")
+    con.print("Su Mo Tu We Th Fr Sa")
     for week in calendar.monthcalendar(year, month):
-        cells = [_format_day(day, day_colors) for day in week]
-        print("".join(cells))
+        row = Text()
+        for day in week:
+            row.append_text(_format_day(day, day_colors))
+        con.print(row)
 
 
-def _format_day(day: int, day_colors: dict[int, str]) -> str:
+def _format_day(day: int, day_colors: dict[int, str]) -> Text:
     if day == 0:
-        return "   "
+        return Text("   ")
     color_name = day_colors.get(day)
     if color_name is not None:
-        ansi = _ANSI[color_name]
-        return f"{ansi}{_ANSI['bold']}{day:>2}{_ANSI['reset']} "
-    return f"{day:>2} "
+        return Text(f"{day:>2} ", style=f"bold {color_name}")
+    return Text(f"{day:>2} ")
 
 
 def _print_calendar_legend(
+    con: Console,
     events: Sequence[EarningsEvent],
     day_colors: dict[int, str],
 ) -> None:
     by_date: dict[str, list[str]] = {}
     for event in events:
         by_date.setdefault(event.earnings_date, []).append(event.ticker)
-    reset = _ANSI["reset"]
     for date_str, tickers in by_date.items():
         day = date.fromisoformat(date_str).day
         color_name = day_colors[day]
-        ansi = _ANSI[color_name]
-        print(f"  {ansi}■{reset} {', '.join(tickers)}")
+        con.print(f"  [{color_name}]■[/] {', '.join(tickers)}")
 
 
 def _build_parser() -> argparse.ArgumentParser:

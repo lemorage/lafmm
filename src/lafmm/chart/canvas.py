@@ -4,25 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from lafmm.colors import ANSI
+
 # Braille dot bits indexed by row * 2 + col (row 0-3, col 0-1)
 _DOT_BITS = (0x01, 0x08, 0x02, 0x10, 0x04, 0x20, 0x40, 0x80)
-
-_COLORS: dict[str, str] = {
-    "red": "\033[31m",
-    "green": "\033[32m",
-    "yellow": "\033[33m",
-    "blue": "\033[34m",
-    "magenta": "\033[35m",
-    "cyan": "\033[36m",
-    "white": "\033[37m",
-    "gray": "\033[90m",
-    "bright_red": "\033[91m",
-    "bright_green": "\033[92m",
-    "bright_yellow": "\033[93m",
-    "bright_cyan": "\033[96m",
-}
-
-_RESET = "\033[0m"
 
 
 @dataclass
@@ -147,15 +132,15 @@ def _render_row(canvas: Canvas, y: int) -> str:
             char = chr(0x2800 | canvas._dots[idx])
             color = canvas._dot_colors[idx]
 
-        ansi = _COLORS.get(color, "")
+        ansi = ANSI.get(color, "")
         if ansi != prev_ansi:
             if prev_ansi:
-                parts.append(_RESET)
+                parts.append(ANSI["reset"])
             if ansi:
                 parts.append(ansi)
             prev_ansi = ansi
         parts.append(char)
 
     if prev_ansi:
-        parts.append(_RESET)
+        parts.append(ANSI["reset"])
     return "".join(parts)
