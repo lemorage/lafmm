@@ -34,17 +34,16 @@ def fetch_bars(ticker: str, start: date, end: date) -> list[Bar]:
     if hasattr(data.columns, "droplevel"):
         with contextlib.suppress(IndexError, ValueError):
             data.columns = data.columns.droplevel(1)
-    ohlcv = data[["Open", "High", "Low", "Close", "Volume"]]
     return [
         Bar(
-            date=str(ohlcv.index[i])[:10],
-            open=round(float(ohlcv.iat[i, 0]), 2),
-            high=round(float(ohlcv.iat[i, 1]), 2),
-            low=round(float(ohlcv.iat[i, 2]), 2),
-            close=round(float(ohlcv.iat[i, 3]), 2),
-            volume=int(ohlcv.iat[i, 4]),
+            date=str(data.index[i])[:10],
+            open=round(float(data["Open"].iloc[i]), 2),
+            high=round(float(data["High"].iloc[i]), 2),
+            low=round(float(data["Low"].iloc[i]), 2),
+            close=round(float(data["Close"].iloc[i]), 2),
+            volume=int(data["Volume"].iloc[i]),
         )
-        for i in range(len(ohlcv))
+        for i in range(len(data))
     ]
 
 
