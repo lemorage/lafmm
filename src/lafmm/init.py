@@ -38,7 +38,7 @@ def scaffold() -> Path:
     (root / AGENT_DATA).mkdir()
     (root / "AGENT.md").write_text(_agent_md())
     (root / "CLAUDE.md").write_text("@AGENT.md\n")
-    (root / ".python").write_text(sys.executable)
+    _write_run_shim(root)
 
     _scaffold_config(root)
     _scaffold_profile(root)
@@ -107,7 +107,7 @@ def ensure_structure(root: Path) -> None:
 
     (root / "AGENT.md").write_text(_agent_md())
     (root / "CLAUDE.md").write_text("@AGENT.md\n")
-    (root / ".python").write_text(sys.executable)
+    _write_run_shim(root)
     _merge_claude_settings(root)
     _update_shipped_skills(root)
 
@@ -172,6 +172,12 @@ def _merge_skill(src: Path, dst: Path) -> None:
             _merge_skill(item, target)
         else:
             shutil.copy2(item, target)
+
+
+def _write_run_shim(root: Path) -> None:
+    shim = root / "run"
+    shim.write_text(f'#!/bin/sh\nexec {sys.executable} "$@"\n')
+    shim.chmod(0o755)
 
 
 def _agent_md() -> str:

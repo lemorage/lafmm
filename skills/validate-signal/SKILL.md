@@ -22,9 +22,9 @@ distinguishable from random chance.
 quality metrics.
 
 ```bash
-uv run .claude/skills/validate-signal/scripts/validate.py ~/.lafmm/data/semis
-uv run .claude/skills/validate-signal/scripts/validate.py ~/.lafmm/data/energy --signal SELL
-uv run .claude/skills/validate-signal/scripts/validate.py ~/.lafmm/data/us-indices --horizon 10
+./run .claude/skills/validate-signal/scripts/validate.py ~/.lafmm/data/semis
+./run .claude/skills/validate-signal/scripts/validate.py ~/.lafmm/data/energy --signal SELL
+./run .claude/skills/validate-signal/scripts/validate.py ~/.lafmm/data/us-indices --horizon 10
 ```
 
 **Options:**

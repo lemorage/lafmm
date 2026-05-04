@@ -8,17 +8,13 @@ must be in sync with the data for your analysis to be current.
 ## The command
 
 ```bash
-$(cat ~/.lafmm/.python) -m lafmm.sync_cache
+./run -m lafmm.sync_cache
 ```
-
-The `.python` file records the Python interpreter that has the lafmm
-package installed. It is written during scaffold (`uv run lafmm`) and
-points to the project's virtual environment Python.
 
 **Options** (rarely needed):
 
 ```bash
-$(cat ~/.lafmm/.python) -m lafmm.sync_cache --data /path/to/data --cache /path/to/cache
+./run -m lafmm.sync_cache --data /path/to/data --cache /path/to/cache
 ```
 
 Override the default `~/.lafmm/data` and `~/.lafmm/cache` paths. Useful

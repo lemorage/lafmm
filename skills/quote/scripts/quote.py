@@ -2,8 +2,8 @@
 """Fetch real-time stock quotes from Finnhub.
 
 Usage:
-    uv run quote.py NVDA
-    uv run quote.py NVDA AAPL SPY
+    ./run .claude/skills/quote/scripts/quote.py NVDA
+    ./run .claude/skills/quote/scripts/quote.py NVDA AAPL SPY
 
 Reads FINNHUB_API_KEY from environment.
 Outputs JSON to stdout, diagnostics to stderr.

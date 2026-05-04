@@ -7,7 +7,7 @@ Usage:
     lafmm sync
 
 Usage from ~/.lafmm/ (agent context):
-    $(cat .python) -m lafmm.sync_cache
+    ./run -m lafmm.sync_cache
 
 Usage as library:
     from lafmm.sync_cache import sync_market

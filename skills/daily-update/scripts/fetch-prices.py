@@ -2,13 +2,14 @@
 """Fetch daily OHLCV prices and append to LAFMM CSV files.
 
 Usage:
-    uv run fetch.py TICKER [--csv PATH] [--start DATE] [--days N]
+    ./run .claude/skills/daily-update/scripts/fetch-prices.py TICKER
+        [--csv PATH] [--start DATE] [--days N]
 
 Examples:
-    uv run fetch.py NVDA                           # append latest to ~/.lafmm/data/*/NVDA/YYYY.csv
-    uv run fetch.py NVDA --csv data/semis/NVDA     # explicit ticker dir
-    uv run fetch.py NVDA --start 2026-01-02        # backfill from date
-    uv run fetch.py NVDA --days 30                 # last 30 calendar days
+    ./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA
+    ./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --csv data/semis/NVDA
+    ./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --start 2026-01-02
+    ./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 30
 
 CSVs are partitioned by year: each ticker gets a directory with one CSV per year.
 Format: date,open,high,low,close,volume (OHLCV).

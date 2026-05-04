@@ -24,8 +24,8 @@ the engine and when to step aside.
 for each.
 
 ```bash
-uv run .claude/skills/detect-regime/scripts/regime.py ~/.lafmm/data/semis
-uv run .claude/skills/detect-regime/scripts/regime.py ~/.lafmm/data/us-indices --json
+./run .claude/skills/detect-regime/scripts/regime.py ~/.lafmm/data/semis
+./run .claude/skills/detect-regime/scripts/regime.py ~/.lafmm/data/us-indices --json
 ```
 
 **Options:**

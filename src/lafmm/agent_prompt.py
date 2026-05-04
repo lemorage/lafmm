@@ -91,7 +91,7 @@ Your working directory is `~/.lafmm/`. All paths below are relative to it.
 
 ```
 ├── AGENT.md                    # this file
-├── .python                     # path to Python with lafmm installed
+├── run                         # runs skill scripts with the correct Python
 ├── data/                       # the truth (TOML + OHLCV CSVs)
 │   ├── us-indices/             # broad US market (scaffolded by default)
 │   │   ├── group.toml          # leaders = ["SPY", "QQQ"]
@@ -106,7 +106,8 @@ Your working directory is `~/.lafmm/`. All paths below are relative to it.
 │   ├── _adhoc/                 # tickers that don't fit any current sector group
 │   │   └── {TICKER}/{YEAR}.csv
 │   └── _meta/                  # cached yfinance metadata (sector, beta, market cap)
-│       └── {TICKER}.json       # identity (permanent) + snapshot (refreshed after 30d)
+│       ├── {TICKER}.json       # identity (permanent) + snapshot (refreshed after 30d)
+│       └── _earnings.json      # next earnings dates for all tickers
 ├── config.toml                 # workspace-wide settings (API keys, preferences)
 ├── profile.md                  # who the human is
 ├── insights/                   # agent's observations about the human

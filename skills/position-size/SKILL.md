@@ -25,7 +25,7 @@ Given a signal's win rate and win/loss ratio, compute the optimal
 fraction of capital to risk per trade.
 
 ```bash
-uv run .claude/skills/position-size/scripts/size.py kelly 0.65 1.5
+./run .claude/skills/position-size/scripts/size.py kelly 0.65 1.5
 ```
 
 Arguments: win_rate (e.g. 0.65 = 65%), win_loss_ratio (avg win / avg
@@ -46,8 +46,8 @@ Historical max drawdown plus forward-looking Monte Carlo simulation
 for a group's leaders.
 
 ```bash
-uv run .claude/skills/position-size/scripts/size.py drawdown ~/.lafmm/data/semis
-uv run .claude/skills/position-size/scripts/size.py drawdown ~/.lafmm/data/energy --json
+./run .claude/skills/position-size/scripts/size.py drawdown ~/.lafmm/data/semis
+./run .claude/skills/position-size/scripts/size.py drawdown ~/.lafmm/data/energy --json
 ```
 
 **Options:**

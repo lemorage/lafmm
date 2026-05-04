@@ -20,7 +20,7 @@ Get trade data from broker into the journal at
 User provides a CSV file:
 
 ```bash
-uv run .claude/skills/sync-trades/scripts/parse_ibkr.py /path/to/LAFMM.csv accounts/{name}/
+./run .claude/skills/sync-trades/scripts/parse_ibkr.py /path/to/LAFMM.csv accounts/{name}/
 ```
 
 The script parses trades/cash/NAV and writes:
@@ -34,12 +34,12 @@ Existing dates are skipped. Safe to re-run.
 Fetch from IBKR API, then parse:
 
 ```bash
-uv run .claude/skills/sync-trades/scripts/fetch_ibkr.py \
+./run .claude/skills/sync-trades/scripts/fetch_ibkr.py \
   --token "$(toml get accounts/{name}/account.toml broker.api.token)" \
   --query-id "$(toml get accounts/{name}/account.toml broker.api.query_id)" \
   --out /tmp/trades.csv
 
-uv run .claude/skills/sync-trades/scripts/parse_ibkr.py /tmp/trades.csv accounts/{name}/
+./run .claude/skills/sync-trades/scripts/parse_ibkr.py /tmp/trades.csv accounts/{name}/
 ```
 
 Read token and query_id from `accounts/{name}/account.toml`:
@@ -115,7 +115,7 @@ group (`data/{group}/{TICKER}/`). For each untracked ticker:
 
 1. Look it up:
    ```bash
-   uv run .claude/skills/sync-trades/scripts/ticker_meta.py NVDA
+   ./run .claude/skills/sync-trades/scripts/ticker_meta.py NVDA
    ```
    Output: `NVDA   Technology / Semiconductors (EQUITY)`
 
@@ -138,7 +138,7 @@ group (`data/{group}/{TICKER}/`). For each untracked ticker:
 
 3. For any ticker placed in a group or `_adhoc`:
    ```bash
-   uv run .claude/skills/daily-update/scripts/fetch-prices.py {TICKER} \
+   ./run .claude/skills/daily-update/scripts/fetch-prices.py {TICKER} \
      --csv data/{group}/{TICKER} --days 730
    ```
    If `data/_adhoc/{TICKER}/` already has data and you are moving

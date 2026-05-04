@@ -30,16 +30,16 @@ same result.
 
 ```bash
 # Append latest prices (auto-discovers ticker dir under ~/.lafmm/data/)
-uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA
+./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA
 
 # Explicit target (directory or file)
-uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --csv ~/.lafmm/data/semis/NVDA
+./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --csv ~/.lafmm/data/semis/NVDA
 
 # Backfill from a specific date
-uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --start 2026-01-02
+./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --start 2026-01-02
 
 # Last 30 calendar days
-uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 30
+./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 30
 ```
 
 The script prints each new row as it appends. If the data is already up
@@ -50,7 +50,7 @@ to date, it says so and exits.
 ### Updating one ticker
 
 ```bash
-uv run .claude/skills/daily-update/scripts/fetch-prices.py SPY
+./run .claude/skills/daily-update/scripts/fetch-prices.py SPY
 ```
 
 Auto-discovers `~/.lafmm/data/us-indices/SPY/` and appends to the
@@ -61,10 +61,10 @@ current year's CSV.
 Read `group.toml` for tickers, then fetch each:
 
 ```bash
-uv run .claude/skills/daily-update/scripts/fetch-prices.py SPY
-uv run .claude/skills/daily-update/scripts/fetch-prices.py QQQ
-uv run .claude/skills/daily-update/scripts/fetch-prices.py DIA
-uv run .claude/skills/daily-update/scripts/fetch-prices.py IWM
+./run .claude/skills/daily-update/scripts/fetch-prices.py SPY
+./run .claude/skills/daily-update/scripts/fetch-prices.py QQQ
+./run .claude/skills/daily-update/scripts/fetch-prices.py DIA
+./run .claude/skills/daily-update/scripts/fetch-prices.py IWM
 ```
 
 ### Populating a new group
@@ -72,8 +72,8 @@ uv run .claude/skills/daily-update/scripts/fetch-prices.py IWM
 Backfill with 2 years of history for SMA 200 warmup and rich pivot structure:
 
 ```bash
-uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 730
-uv run .claude/skills/daily-update/scripts/fetch-prices.py AVGO --days 730
+./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 730
+./run .claude/skills/daily-update/scripts/fetch-prices.py AVGO --days 730
 ```
 
 730 calendar days gives roughly 500 trading days.
@@ -99,8 +99,8 @@ candlestick patterns). `volume` supports future liquidity analysis.
 
 ## Prerequisites
 
-The script uses PEP 723 inline metadata — `uv run` automatically installs
-yfinance into a cached environment on first use. No manual setup needed.
+The script imports from the `lafmm` package. Run it with `./run` from
+the workspace root. No manual setup needed.
 
 ## Error handling
 

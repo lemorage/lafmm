@@ -6,7 +6,7 @@
 """Fetch IBKR Flex Query report via the Flex Web Service API.
 
 Usage:
-    uv run fetch_ibkr.py --token TOKEN --query-id ID [--out PATH]
+    ./run .claude/skills/sync-trades/scripts/fetch_ibkr.py --token TOKEN --query-id ID [--out PATH]
 
 Two-step:
   1. SendRequest with token + query_id → reference code

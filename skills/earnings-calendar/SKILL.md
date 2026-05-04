@@ -27,10 +27,10 @@ is fetched automatically. First run fetches all tickers; subsequent
 runs only refetch tickers whose dates have passed.
 
 ```bash
-uv run .claude/skills/earnings-calendar/scripts/earnings.py ~/.lafmm/data
-uv run .claude/skills/earnings-calendar/scripts/earnings.py ~/.lafmm/data --group semis --days 7
-uv run .claude/skills/earnings-calendar/scripts/earnings.py ~/.lafmm/data --cal
-uv run .claude/skills/earnings-calendar/scripts/earnings.py ~/.lafmm/data --json
+./run .claude/skills/earnings-calendar/scripts/earnings.py ~/.lafmm/data
+./run .claude/skills/earnings-calendar/scripts/earnings.py ~/.lafmm/data --group semis --days 7
+./run .claude/skills/earnings-calendar/scripts/earnings.py ~/.lafmm/data --cal
+./run .claude/skills/earnings-calendar/scripts/earnings.py ~/.lafmm/data --json
 ```
 
 **Options:**

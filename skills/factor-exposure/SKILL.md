@@ -21,8 +21,8 @@ the Livermore signals are not adding edge in that group.
 `scripts/factor.py` regresses each leader's returns against SPY.
 
 ```bash
-uv run .claude/skills/factor-exposure/scripts/factor.py ~/.lafmm/data/semis
-uv run .claude/skills/factor-exposure/scripts/factor.py ~/.lafmm/data/energy --json
+./run .claude/skills/factor-exposure/scripts/factor.py ~/.lafmm/data/semis
+./run .claude/skills/factor-exposure/scripts/factor.py ~/.lafmm/data/energy --json
 ```
 
 **Options:**

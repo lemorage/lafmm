@@ -123,8 +123,8 @@ After scaffolding, invoke the other skills in order:
 
 1. **fetch-prices** — backfill 2 years of data for each ticker (SMA 200 needs ~250 bars for warmup):
    ```bash
-   uv run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 730
-   uv run .claude/skills/daily-update/scripts/fetch-prices.py AVGO --days 730
+   ./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 730
+   ./run .claude/skills/daily-update/scripts/fetch-prices.py AVGO --days 730
    ```
    Before fetching, check if `data/_adhoc/{TICKER}/` exists. If so, move
    it to the group directory instead of fetching, then delete the
@@ -132,7 +132,7 @@ After scaffolding, invoke the other skills in order:
 
 2. **tune-thresholds** — compute ATR-based thresholds from the fetched data:
    ```bash
-   uv run .claude/skills/tune-thresholds/scripts/atr.py ~/.lafmm/data/{group}
+   ./run .claude/skills/tune-thresholds/scripts/atr.py ~/.lafmm/data/{group}
    ```
    Present the suggested values to the user. If they agree, update
    `group.toml` with the new swing_pct and confirm_pct.

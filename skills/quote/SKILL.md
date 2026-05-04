@@ -13,8 +13,8 @@ Fetch real-time US equity prices from Finnhub.
 ## Quick use
 
 ```bash
-uv run .claude/skills/quote/scripts/quote.py NVDA              # single ticker
-uv run .claude/skills/quote/scripts/quote.py NVDA AAPL SPY     # multiple tickers
+./run .claude/skills/quote/scripts/quote.py NVDA              # single ticker
+./run .claude/skills/quote/scripts/quote.py NVDA AAPL SPY     # multiple tickers
 ```
 
 ## JSON output

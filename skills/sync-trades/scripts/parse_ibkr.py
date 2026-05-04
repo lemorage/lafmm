@@ -5,7 +5,7 @@
 """Parse IBKR Flex Query CSV and write LAFMM journal entries.
 
 Usage:
-    uv run parse_ibkr.py CSV_FILE ACCOUNT_DIR
+    ./run .claude/skills/sync-trades/scripts/parse_ibkr.py CSV_FILE ACCOUNT_DIR
 
 Reads an IBKR Flex Query CSV export (with section codes enabled),
 parses trades, cash flows, and NAV data, and writes year-partitioned
@@ -161,7 +161,8 @@ which may differ for international transfers.
 - **order**: `market`, `limit`, `stop`, or `—`
 - **pnl**: realized P&L from broker. `—` on opens.
 - **open_close**: `O` (opening), `C` (closing), or `—`
-- **signal**: most recent matching Livermore signal before trade date (BUY for buys, SELL for sells), or `—` if none or contradicting
+- **signal**: most recent matching Livermore signal before trade date
+  (BUY for buys, SELL for sells), or `—` if none or contradicting
 
 ### Observations
 

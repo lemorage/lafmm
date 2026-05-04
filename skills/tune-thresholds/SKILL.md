@@ -25,11 +25,11 @@ daily volatility, giving us an objective basis for setting these values.
 swing_pct / confirm_pct values. It does not modify any files.
 
 ```bash
-uv run .claude/skills/tune-thresholds/scripts/atr.py ~/.lafmm/data/semis
+./run .claude/skills/tune-thresholds/scripts/atr.py ~/.lafmm/data/semis
 
-uv run .claude/skills/tune-thresholds/scripts/atr.py ~/.lafmm/data/us-indices --period 20
+./run .claude/skills/tune-thresholds/scripts/atr.py ~/.lafmm/data/us-indices --period 20
 
-uv run .claude/skills/tune-thresholds/scripts/atr.py ~/.lafmm/data/energy --multiplier 2.0
+./run .claude/skills/tune-thresholds/scripts/atr.py ~/.lafmm/data/energy --multiplier 2.0
 ```
 
 **Options:**
