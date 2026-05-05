@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1
+
+- fix: use named column access in fetch_bars to prevent open/close swap
+- fix: replace uv run with ./run shim for skill scripts
+- new: category field in ticker metadata for ETF placement
+
 ## 0.6.0
 
 - new skill: qualify with three-perspective entry analysis (momentum breakout, range, oversold bounce)

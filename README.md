@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" width="680" alt="LAFMM">
+  <img src="assets/banner.png" width="580" alt="LAFMM">
 </p>
 
 # LAFMM
