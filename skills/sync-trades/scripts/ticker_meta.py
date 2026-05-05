@@ -52,11 +52,13 @@ def main() -> None:
         print(json.dumps([asdict(r) for r in results], indent=2))
     else:
         for meta in results:
-            print(
+            line = (
                 f"{meta.symbol:<6} "
-                f"{meta.identity.sector} / {meta.identity.industry} "
+                f"{meta.identity.sector or meta.identity.category} / "
+                f"{meta.identity.industry} "
                 f"({meta.identity.quote_type})"
             )
+            print(line)
 
 
 if __name__ == "__main__":

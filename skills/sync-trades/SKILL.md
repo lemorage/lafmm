@@ -125,9 +125,11 @@ group (`data/{group}/{TICKER}/`). For each untracked ticker:
    Do not guess from training data.
 
 2. Decide placement:
-   - **Leveraged/inverse ETF** (`quoteType: ETF` and name contains
-     "Ultra", "ProShares", "Direxion", "2x", "3x", "-1x", "inverse",
-     or similar). Place in `data/_adhoc/{TICKER}/`.
+   - **Leveraged/inverse ETF** (`quoteType: ETF` and `category`
+     indicates leveraged or inverse, e.g. "Trading--Leveraged Equity",
+     "Trading--Inverse Equity"). These products don't trend like
+     equities and will corrupt engine signals if placed in groups.
+     Place in `data/_adhoc/{TICKER}/`.
    - **Equity that fits an existing group.** Read each group's
      `group.toml` name and the tickers already in it. If the stock's
      industry matches a group's theme, add it there. Example: AMD

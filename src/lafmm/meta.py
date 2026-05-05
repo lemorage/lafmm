@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
 from typing import cast
@@ -17,6 +17,7 @@ class TickerIdentity:
     sector: str
     industry: str
     quote_type: str
+    category: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,28 +45,8 @@ _META_DIR = "_meta"
 def _write_ticker_meta(data_dir: Path, meta: TickerMeta) -> None:
     meta_dir = data_dir / _META_DIR
     meta_dir.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "symbol": meta.symbol,
-        "identity": {
-            "fetched": meta.identity.fetched,
-            "long_name": meta.identity.long_name,
-            "sector": meta.identity.sector,
-            "industry": meta.identity.industry,
-            "quote_type": meta.identity.quote_type,
-        },
-        "snapshot": {
-            "fetched": meta.snapshot.fetched,
-            "market_cap": meta.snapshot.market_cap,
-            "beta": meta.snapshot.beta,
-            "average_volume": meta.snapshot.average_volume,
-            "short_ratio": meta.snapshot.short_ratio,
-            "short_percent_of_float": meta.snapshot.short_percent_of_float,
-            "fifty_two_week_high": meta.snapshot.fifty_two_week_high,
-            "fifty_two_week_low": meta.snapshot.fifty_two_week_low,
-        },
-    }
     json_path = meta_dir / f"{meta.symbol}.json"
-    json_path.write_text(json.dumps(payload, indent=2) + "\n")
+    json_path.write_text(json.dumps(asdict(meta), indent=2) + "\n")
 
 
 def load_ticker_meta(data_dir: Path, symbol: str) -> TickerMeta | None:
@@ -80,33 +61,40 @@ type _StrDict = dict[str, str | int | float]
 
 
 def _parse_ticker_meta(raw: dict[str, object]) -> TickerMeta:
-    ident = cast(_StrDict, raw["identity"])
-    snap = cast(_StrDict, raw["snapshot"])
     return TickerMeta(
         symbol=str(raw["symbol"]),
-        identity=TickerIdentity(
-            fetched=str(ident["fetched"]),
-            long_name=str(ident["long_name"]),
-            sector=str(ident["sector"]),
-            industry=str(ident["industry"]),
-            quote_type=str(ident["quote_type"]),
-        ),
-        snapshot=TickerSnapshot(
-            fetched=str(snap["fetched"]),
-            market_cap=int(snap["market_cap"]),
-            beta=float(snap["beta"]),
-            average_volume=int(snap["average_volume"]),
-            short_ratio=float(snap["short_ratio"]),
-            short_percent_of_float=float(snap["short_percent_of_float"]),
-            fifty_two_week_high=float(snap["fifty_two_week_high"]),
-            fifty_two_week_low=float(snap["fifty_two_week_low"]),
-        ),
+        identity=_parse_identity(cast(_StrDict, raw["identity"])),
+        snapshot=_parse_snapshot(cast(_StrDict, raw["snapshot"])),
+    )
+
+
+def _parse_identity(raw: _StrDict) -> TickerIdentity:
+    return TickerIdentity(
+        fetched=str(raw["fetched"]),
+        long_name=str(raw["long_name"]),
+        sector=str(raw["sector"]),
+        industry=str(raw["industry"]),
+        quote_type=str(raw["quote_type"]),
+        category=str(raw.get("category", "")),
+    )
+
+
+def _parse_snapshot(raw: _StrDict) -> TickerSnapshot:
+    return TickerSnapshot(
+        fetched=str(raw["fetched"]),
+        market_cap=int(raw["market_cap"]),
+        beta=float(raw["beta"]),
+        average_volume=int(raw["average_volume"]),
+        short_ratio=float(raw["short_ratio"]),
+        short_percent_of_float=float(raw["short_percent_of_float"]),
+        fifty_two_week_high=float(raw["fifty_two_week_high"]),
+        fifty_two_week_low=float(raw["fifty_two_week_low"]),
     )
 
 
 def fetch_ticker_meta(symbol: str) -> TickerMeta | None:
     info = _fetch_info(symbol)
-    if not info or "sector" not in info:
+    if not info or ("sector" not in info and "quoteType" not in info):
         return None
     today = date.today().isoformat()
     return TickerMeta(
@@ -131,6 +119,7 @@ def _build_identity(info: _StrDict, today: str) -> TickerIdentity:
         sector=str(info.get("sector", "")),
         industry=str(info.get("industry", "")),
         quote_type=str(info.get("quoteType", "")),
+        category=str(info.get("category", "")),
     )
 
 
