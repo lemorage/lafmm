@@ -32,6 +32,7 @@ SIGNAL_STYLES: dict[SignalType, tuple[str, str]] = {
     SignalType.SELL: (f"bold {NEGATIVE}", "SELL"),
     SignalType.DANGER_UP_OVER: (f"bold {NEUTRAL}", "DANGER: Up Over"),
     SignalType.DANGER_DOWN_OVER: (f"bold {NEUTRAL}", "DANGER: Dn Over"),
+    SignalType.WATCH: ("bold cyan", "WATCH"),
 }
 
 TREND_STYLES: dict[GroupTrend, tuple[str, str]] = {

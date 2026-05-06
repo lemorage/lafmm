@@ -3,7 +3,7 @@ from typing import ClassVar
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import VerticalScroll
 from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Header, Label, Static
@@ -67,18 +67,22 @@ Screen {
 #market-header.bearish, #group-header.bearish { color: $error; }
 #market-header.neutral, #group-header.neutral { color: $warning; }
 
-#groups-table, #map-table {
+#groups-table {
     height: 1fr;
+}
+
+#map-table {
+    height: auto;
 }
 
 #tracked-table {
     height: auto;
-    max-height: 30%;
+    max-height: 20;
     margin: 0;
 }
 
 #stock-table {
-    height: 1fr;
+    height: auto;
 }
 
 .section-label {
@@ -88,10 +92,6 @@ Screen {
     margin: 1 0 0 0;
 }
 
-.signal-line {
-    padding: 0 2;
-    margin: 0;
-}
 """
 
 
@@ -277,7 +277,7 @@ class GroupScreen(Screen):
             yield DataTable(id="map-table", cursor_type="row", zebra_stripes=True, fixed_columns=1)
 
             yield Label(" Signals", classes="section-label")
-            yield Vertical(id="signals-container")
+            yield DataTable(id="signal-table", cursor_type="none", zebra_stripes=True)
 
             if self._tracked:
                 yield Label(" Tracked Stocks", classes="section-label")
@@ -340,7 +340,6 @@ class GroupScreen(Screen):
         b: StockState,
         kp: StockState | None,
     ) -> None:
-        container = self.query_one("#signals-container")
         self._all_signals = [
             *((a.ticker, s) for s in a.engine.signals),
             *((b.ticker, s) for s in b.engine.signals),
@@ -348,12 +347,7 @@ class GroupScreen(Screen):
         if kp:
             self._all_signals.extend(("KEY", s) for s in kp.engine.signals)
 
-        if not self._all_signals:
-            container.mount(Label("  No signals yet.", classes="signal-line"))
-            return
-
-        table = DataTable(id="signal-table", cursor_type="none", zebra_stripes=True)
-        container.mount(table)
+        table = self.query_one("#signal-table", DataTable)
         _populate_signal_table(table, self._all_signals)
 
     def _rebuild_signal_table(self) -> None:
@@ -430,7 +424,7 @@ class StockScreen(Screen):
 
             if self.stock.engine.signals:
                 yield Label(" Signals", classes="section-label")
-                yield Vertical(id="stock-signals")
+                yield DataTable(id="stock-signal-table", cursor_type="none", zebra_stripes=True)
 
             if self.stock.engine.pivots:
                 yield Label(" Pivotal Points", classes="section-label")
@@ -457,10 +451,8 @@ class StockScreen(Screen):
             table.add_row(*row)
 
     def _populate_signals(self) -> None:
-        container = self.query_one("#stock-signals")
+        table = self.query_one("#stock-signal-table", DataTable)
         signals = [(self.stock.ticker, s) for s in self.stock.engine.signals]
-        table = DataTable(cursor_type="none", zebra_stripes=True)
-        container.mount(table)
         _populate_signal_table(table, signals)
 
     def _populate_pivots(self) -> None:
