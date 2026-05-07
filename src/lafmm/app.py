@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import ClassVar, Final
 
 from rich.text import Text
 from textual.app import App, ComposeResult
@@ -12,6 +12,7 @@ from lafmm.group import group_leaders, group_tracked, group_trend, market_trend
 from lafmm.models import (
     COL_ORDER,
     Col,
+    EngineState,
     Entry,
     GroupState,
     GroupTrend,
@@ -30,6 +31,40 @@ TREND_COLORS: dict[GroupTrend, str] = {
     "bearish": "red",
     "neutral": "yellow",
 }
+
+DEFAULT_ZOOM_DEPTH: Final[int] = 5
+
+
+def trend_boundary(
+    pivots: tuple[PivotalPoint, ...],
+    depth: int,
+) -> str | None:
+    if depth <= 0:
+        return None
+    confirmed = [p for p in pivots if p.source_col.is_confirmed_trend]
+    if not confirmed or depth > len(confirmed):
+        return None
+    return confirmed[-depth].date
+
+
+def _filter_engine(
+    engine: EngineState,
+    start: str | None,
+) -> tuple[tuple[Entry, ...], tuple[PivotalPoint, ...], tuple[Signal, ...]]:
+    if start is None:
+        return engine.entries, engine.pivots, engine.signals
+    return (
+        tuple(e for e in engine.entries if e.date >= start),
+        tuple(p for p in engine.pivots if p.date >= start),
+        tuple(s for s in engine.signals if s.date >= start),
+    )
+
+
+def _init_zoom(pivots: tuple[PivotalPoint, ...]) -> tuple[int, int]:
+    confirmed = [p for p in pivots if p.source_col.is_confirmed_trend]
+    total = len(confirmed)
+    depth = min(DEFAULT_ZOOM_DEPTH, total) if confirmed else 0
+    return total, depth
 
 
 def _signal_text(signal_type: SignalType) -> Text:
@@ -246,7 +281,9 @@ class GroupScreen(Screen):
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("escape", "go_back", "Back", priority=True),
         Binding("enter", "select_tracked", "Open Stock", priority=True),
-        Binding("k", "toggle_key", "Toggle KEY", priority=True),
+        Binding("k", "toggle_key", "Toggle KEY", show=False, priority=True),
+        Binding("-", "zoom_out", "Zoom out", show=False, priority=True),
+        Binding("+,=", "zoom_in", "Zoom in", show=False, priority=True),
     ]
 
     def __init__(self, state: GroupState) -> None:
@@ -254,26 +291,33 @@ class GroupScreen(Screen):
         self._tracked = group_tracked(state)
         self._key_visible = True
         self._all_signals: list[tuple[str, Signal]] = []
+        pivots = state.key_price.engine.pivots if state.key_price else ()
+        self._total_boundaries, self._zoom_depth = _init_zoom(pivots)
         super().__init__()
+
+    def _header_text(self) -> str:
+        trend = group_trend(self.state)
+        return f"{self.state.config.name}  —  Key Price: {trend.upper()}"
+
+    def _map_label(self) -> str:
+        a, b = group_leaders(self.state)
+        kp = self.state.key_price
+        pivots = kp.engine.pivots if kp else ()
+        start = trend_boundary(pivots, self._zoom_depth)
+        base = f" {a.ticker} + {b.ticker} — Livermore Map"
+        if start is None:
+            return base
+        return f"{base}  [dim]since {start}[/dim]"
 
     def compose(self) -> ComposeResult:
         yield Header()
 
-        trend = group_trend(self.state)
-        header = Label(
-            f"{self.state.config.name}  —  Key Price: {trend.upper()}",
-            id="group-header",
-        )
-        header.add_class(trend)
+        header = Label(self._header_text(), id="group-header")
+        header.add_class(group_trend(self.state))
         yield header
 
-        a, b = group_leaders(self.state)
-
         with VerticalScroll():
-            yield Label(
-                f" {a.ticker} + {b.ticker} — Livermore Map",
-                classes="section-label",
-            )
+            yield Label(self._map_label(), id="map-label", classes="section-label")
             yield DataTable(id="map-table", cursor_type="row", zebra_stripes=True, fixed_columns=1)
 
             yield Label(" Signals", classes="section-label")
@@ -290,23 +334,21 @@ class GroupScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
-        a, b = group_leaders(self.state)
-        kp = self.state.key_price
-
-        self._populate_map(a, b, kp)
-        self._populate_signals(a, b, kp)
-
+        self._rebuild()
         if self._tracked:
             self._populate_tracked_list()
 
-    def _populate_map(
-        self,
-        a: StockState,
-        b: StockState,
-        kp: StockState | None,
-    ) -> None:
-        table = self.query_one("#map-table", DataTable)
+    def _rebuild(self) -> None:
+        kp = self.state.key_price
+        pivots = kp.engine.pivots if kp else ()
+        start = trend_boundary(pivots, self._zoom_depth)
 
+        a, b = group_leaders(self.state)
+        self._populate_map(a, b, kp, start)
+        self._populate_signals(a, b, kp, start)
+        self.query_one("#map-label", Label).update(self._map_label())
+
+    def _map_columns(self, table: DataTable, a: StockState, b: StockState) -> None:
         table.add_column("Date", key="date")
         for col in COL_ORDER:
             table.add_column(f"{a.ticker} {col.short}", key=f"a_{col.name}")
@@ -317,21 +359,32 @@ class GroupScreen(Screen):
         for col in COL_ORDER:
             table.add_column(f"KEY {col.short}", key=f"k_{col.name}")
 
-        a_by_date = {e.date: e for e in a.engine.entries}
-        b_by_date = {e.date: e for e in b.engine.entries}
-        kp_dates = {e.date: e for e in kp.engine.entries} if kp else {}
-        all_dates = sorted(
-            a_by_date.keys() | b_by_date.keys() | kp_dates.keys(),
-        )
-        kp_pivots = kp.engine.pivots if kp else ()
+    def _populate_map(
+        self,
+        a: StockState,
+        b: StockState,
+        kp: StockState | None,
+        start: str | None,
+    ) -> None:
+        table = self.query_one("#map-table", DataTable)
+        table.clear(columns=True)
+        self._map_columns(table, a, b)
 
-        for date in all_dates:
+        a_entries, a_pivots, _ = _filter_engine(a.engine, start)
+        b_entries, b_pivots, _ = _filter_engine(b.engine, start)
+        kp_entries, kp_pivots, _ = _filter_engine(kp.engine, start) if kp else ((), (), ())
+
+        a_by_date = {e.date: e for e in a_entries}
+        b_by_date = {e.date: e for e in b_entries}
+        kp_by_date = {e.date: e for e in kp_entries}
+
+        for date in sorted(a_by_date.keys() | b_by_date.keys() | kp_by_date.keys()):
             row: list[Text | str] = [date]
-            row.extend(_entry_cells(a_by_date.get(date), a.engine.pivots))
+            row.extend(_entry_cells(a_by_date.get(date), a_pivots))
             row.append("")
-            row.extend(_entry_cells(b_by_date.get(date), b.engine.pivots))
+            row.extend(_entry_cells(b_by_date.get(date), b_pivots))
             row.append("")
-            row.extend(_entry_cells(kp_dates.get(date), kp_pivots))
+            row.extend(_entry_cells(kp_by_date.get(date), kp_pivots))
             table.add_row(*row)
 
     def _populate_signals(
@@ -339,15 +392,21 @@ class GroupScreen(Screen):
         a: StockState,
         b: StockState,
         kp: StockState | None,
+        start: str | None,
     ) -> None:
+        _, _, a_sigs = _filter_engine(a.engine, start)
+        _, _, b_sigs = _filter_engine(b.engine, start)
+
         self._all_signals = [
-            *((a.ticker, s) for s in a.engine.signals),
-            *((b.ticker, s) for s in b.engine.signals),
+            *((a.ticker, s) for s in a_sigs),
+            *((b.ticker, s) for s in b_sigs),
         ]
         if kp:
-            self._all_signals.extend(("KEY", s) for s in kp.engine.signals)
+            _, _, kp_sigs = _filter_engine(kp.engine, start)
+            self._all_signals.extend(("KEY", s) for s in kp_sigs)
 
         table = self.query_one("#signal-table", DataTable)
+        table.clear(columns=True)
         _populate_signal_table(table, self._all_signals)
 
     def _rebuild_signal_table(self) -> None:
@@ -395,6 +454,16 @@ class GroupScreen(Screen):
         if row < len(self._tracked):
             self.app.push_screen(StockScreen(self._tracked[row]))
 
+    def action_zoom_out(self) -> None:
+        if self._zoom_depth > 0:
+            self._zoom_depth -= 1
+            self._rebuild()
+
+    def action_zoom_in(self) -> None:
+        if self._zoom_depth < self._total_boundaries:
+            self._zoom_depth += 1
+            self._rebuild()
+
     def action_go_back(self) -> None:
         self.app.pop_screen()
 
@@ -405,21 +474,30 @@ class GroupScreen(Screen):
 class StockScreen(Screen):
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("escape", "go_back", "Back", priority=True),
+        Binding("-", "zoom_out", "Zoom out", show=False, priority=True),
+        Binding("+,=", "zoom_in", "Zoom in", show=False, priority=True),
     ]
 
     def __init__(self, stock: StockState) -> None:
         self.stock = stock
+        self._total_boundaries, self._zoom_depth = _init_zoom(stock.engine.pivots)
         super().__init__()
+
+    def _header_text(self) -> str:
+        return f"{self.stock.ticker}  —  swing={self.stock.config.swing:.1f}"
+
+    def _zoom_label(self) -> str:
+        start = trend_boundary(self.stock.engine.pivots, self._zoom_depth)
+        if start is None:
+            return ""
+        return f" [dim]since {start}[/dim]"
 
     def compose(self) -> ComposeResult:
         yield Header()
-
-        yield Label(
-            f"{self.stock.ticker}  —  swing={self.stock.config.swing:.1f}",
-            id="stock-header",
-        )
+        yield Label(self._header_text(), id="stock-header")
 
         with VerticalScroll():
+            yield Label(self._zoom_label(), id="zoom-label")
             yield DataTable(id="stock-table", cursor_type="row", zebra_stripes=True)
 
             if self.stock.engine.signals:
@@ -433,33 +511,48 @@ class StockScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
-        self._populate_table()
-        if self.stock.engine.signals:
-            self._populate_signals()
-        if self.stock.engine.pivots:
-            self._populate_pivots()
+        self._rebuild()
 
-    def _populate_table(self) -> None:
+    def _rebuild(self) -> None:
+        start = trend_boundary(self.stock.engine.pivots, self._zoom_depth)
+        entries, pivots, signals = _filter_engine(self.stock.engine, start)
+
+        self._populate_table(entries, pivots)
+        if self.stock.engine.signals:
+            self._populate_signals(signals)
+        if self.stock.engine.pivots:
+            self._populate_pivots(pivots)
+
+        self.query_one("#zoom-label", Label).update(self._zoom_label())
+
+    def _populate_table(
+        self,
+        entries: tuple[Entry, ...],
+        pivots: tuple[PivotalPoint, ...],
+    ) -> None:
         table = self.query_one("#stock-table", DataTable)
+        table.clear(columns=True)
         table.add_column("Date", key="date")
         for col in COL_ORDER:
             table.add_column(col.short, key=col.name)
 
-        for entry in self.stock.engine.entries:
+        for entry in entries:
             row: list[Text | str] = [entry.date]
-            row.extend(_entry_cells(entry, self.stock.engine.pivots))
+            row.extend(_entry_cells(entry, pivots))
             table.add_row(*row)
 
-    def _populate_signals(self) -> None:
+    def _populate_signals(self, signals: tuple[Signal, ...]) -> None:
         table = self.query_one("#stock-signal-table", DataTable)
-        signals = [(self.stock.ticker, s) for s in self.stock.engine.signals]
-        _populate_signal_table(table, signals)
+        table.clear(columns=True)
+        tagged = [(self.stock.ticker, s) for s in signals]
+        _populate_signal_table(table, tagged)
 
-    def _populate_pivots(self) -> None:
+    def _populate_pivots(self, pivots: tuple[PivotalPoint, ...]) -> None:
         table = self.query_one("#pivot-table", DataTable)
+        table.clear(columns=True)
         table.add_columns("Date", "Column", "Price", "Underline")
 
-        for p in self.stock.engine.pivots:
+        for p in pivots:
             ul_style = "bold red" if p.underline == "red" else "bold white"
             table.add_row(
                 p.date,
@@ -467,6 +560,16 @@ class StockScreen(Screen):
                 f"${p.price:.2f}",
                 Text(p.underline, style=ul_style),
             )
+
+    def action_zoom_out(self) -> None:
+        if self._zoom_depth > 0:
+            self._zoom_depth -= 1
+            self._rebuild()
+
+    def action_zoom_in(self) -> None:
+        if self._zoom_depth < self._total_boundaries:
+            self._zoom_depth += 1
+            self._rebuild()
 
     def action_go_back(self) -> None:
         self.app.pop_screen()
@@ -513,6 +616,8 @@ HELP_TEXT = (
     "│ [bold]Key[/]   │ [bold]Action[/]                 │\n"
     "├───────┼────────────────────────┤\n"
     "│ ?     │ This help              │\n"
+    "│ -     │ Zoom out (more hist.)  │\n"
+    "│ +     │ Zoom in (less hist.)   │\n"
     "│ k     │ Toggle KEY signals     │\n"
     "│ Enter │ Open selected          │\n"
     "│ Esc   │ Back / close           │\n"
