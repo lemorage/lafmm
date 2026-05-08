@@ -39,7 +39,7 @@ class Trade:
     time: str
     symbol: str
     side: str
-    qty: int
+    qty: float
     price: float
     fees: float
     order: str
@@ -67,7 +67,7 @@ class Position:
     pnl: float
     fees: float
     signal: str
-    peak_qty: int
+    peak_qty: float
     entry_price: float
     exit_price: float
     hold_days: int
@@ -299,7 +299,7 @@ def _parse_trades(d: str, text: str) -> list[Trade]:
                     time=parts[0],
                     symbol=parts[1],
                     side=parts[2],
-                    qty=int(parts[3]),
+                    qty=float(parts[3]),
                     price=float(parts[4]),
                     fees=float(parts[5]),
                     order=parts[6],
@@ -328,7 +328,7 @@ def _emit_position(
     trades: Sequence[Trade],
     open_date: str,
     close_date: str,
-    peak_qty: int,
+    peak_qty: float,
 ) -> Position:
     opens = tuple(t for t in trades if t.open_close == "O")
     closes = tuple(t for t in trades if t.open_close == "C")
@@ -354,10 +354,10 @@ def build_positions(
     trades: Sequence[Trade],
 ) -> tuple[tuple[Position, ...], int]:
     sorted_trades = sorted(trades, key=lambda t: (t.date, t.time))
-    qty: dict[str, int] = defaultdict(int)
+    qty: dict[str, float] = defaultdict(float)
     open_dates: dict[str, str] = {}
     accumulated: dict[str, list[Trade]] = defaultdict(list)
-    peak: dict[str, int] = defaultdict(int)
+    peak: dict[str, float] = defaultdict(float)
     positions: list[Position] = []
 
     for trade in sorted_trades:
@@ -383,7 +383,7 @@ def build_positions(
             qty[symbol] = new_qty
             continue
 
-        if new_qty == 0:
+        if abs(new_qty) < 1e-9:
             accumulated[symbol].append(trade)
             positions.append(
                 _emit_position(
@@ -393,7 +393,7 @@ def build_positions(
             del open_dates[symbol]
             del accumulated[symbol]
             del peak[symbol]
-            qty[symbol] = 0
+            qty[symbol] = 0.0
             continue
 
         # sign crossing (flip): split trade into close + open portions

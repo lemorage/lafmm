@@ -181,7 +181,7 @@ class Trade:
     time: str
     symbol: str
     side: str
-    qty: int
+    qty: float
     price: float
     fees: float
     order: str
@@ -239,7 +239,7 @@ def normalize_trade(raw: dict[str, str]) -> Trade | None:
         time=_parse_time(raw["DateTime"]),
         symbol=raw["Symbol"],
         side="buy" if raw["Buy/Sell"] == "BUY" else "sell",
-        qty=abs(int(raw["Quantity"])),
+        qty=abs(float(raw["Quantity"])),
         price=float(raw["TradePrice"]),
         fees=abs(float(raw["IBCommission"])),
         order=ORDER_MAP.get(raw["OrderType"], raw["OrderType"].lower() or "—"),
@@ -284,10 +284,14 @@ def normalize_cash(raw: Sequence[dict[str, str]]) -> dict[str, list[str]]:
     return dict(by_date)
 
 
+def _format_qty(qty: float) -> str:
+    return str(int(qty)) if qty == int(qty) else f"{qty:.4g}"
+
+
 def _format_trade_row(trade: Trade, signal: str = "—") -> str:
     return (
         f"| {trade.time} | {trade.symbol} | {trade.side} "
-        f"| {trade.qty} | {trade.price:.2f} | {trade.fees:.2f} "
+        f"| {_format_qty(trade.qty)} | {trade.price:.2f} | {trade.fees:.2f} "
         f"| {trade.order} | {trade.pnl} | {trade.open_close} | {signal} |"
     )
 
