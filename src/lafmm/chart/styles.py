@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lafmm.chart.canvas import Canvas
+from lafmm.colors import TERM_NEGATIVE, TERM_POSITIVE, TERM_WATCH
 
 
 @dataclass(frozen=True)
@@ -42,7 +43,7 @@ class Viewport:
 @dataclass(frozen=True)
 class LineSeries:
     ys: tuple[float, ...]
-    color: str = "green"
+    color: str = TERM_POSITIVE
     label: str = ""
 
 
@@ -52,17 +53,17 @@ class CandleSeries:
     highs: tuple[float, ...]
     lows: tuple[float, ...]
     closes: tuple[float, ...]
-    up_color: str = "green"
-    down_color: str = "red"
+    up_color: str = TERM_POSITIVE
+    down_color: str = TERM_NEGATIVE
     label: str = ""
 
 
 @dataclass(frozen=True)
 class HistogramSeries:
     ys: tuple[float, ...]
-    color: str = "cyan"
-    up_color: str = "green"
-    down_color: str = "red"
+    color: str = TERM_WATCH
+    up_color: str = TERM_POSITIVE
+    down_color: str = TERM_NEGATIVE
     baseline: float = 0.0
     dual_color: bool = False
     label: str = ""
@@ -72,7 +73,7 @@ class HistogramSeries:
 @dataclass(frozen=True)
 class AreaSeries:
     ys: tuple[float, ...]
-    color: str = "green"
+    color: str = TERM_POSITIVE
     label: str = ""
 
 

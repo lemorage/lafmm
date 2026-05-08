@@ -8,6 +8,26 @@ from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Header, Label, Static
 
+from lafmm.colors import (
+    BG,
+    BG_CURSOR,
+    BG_DEEP,
+    BG_ELEVATED,
+    BG_HOVER,
+    BG_SUBTLE,
+    DANGER,
+    FG,
+    FG_ACCENT,
+    FG_DIM,
+    FG_FAINT,
+    FG_MUTED,
+    KEY_GRAD_END,
+    KEY_GRAD_START,
+    NEGATIVE,
+    NEUTRAL,
+    POSITIVE,
+    WATCH,
+)
 from lafmm.group import group_leaders, group_tracked, group_trend, market_trend
 from lafmm.models import (
     COL_ORDER,
@@ -24,12 +44,10 @@ from lafmm.models import (
 )
 from lafmm.tui import INK_STYLES, format_price
 
-DANGER_COLOR = "#ffaa00"
-
 TREND_COLORS: dict[GroupTrend, str] = {
-    "bullish": "green",
-    "bearish": "red",
-    "neutral": "yellow",
+    "bullish": POSITIVE,
+    "bearish": NEGATIVE,
+    "neutral": NEUTRAL,
 }
 
 DEFAULT_ZOOM_DEPTH: Final[int] = 5
@@ -70,62 +88,119 @@ def _init_zoom(pivots: tuple[PivotalPoint, ...]) -> tuple[int, int]:
 def _signal_text(signal_type: SignalType) -> Text:
     match signal_type:
         case SignalType.BUY:
-            return Text("BUY", style="bold green")
+            return Text("BUY", style=f"bold {POSITIVE}")
         case SignalType.SELL:
-            return Text("SELL", style="bold red")
+            return Text("SELL", style=f"bold {NEGATIVE}")
         case SignalType.DANGER_UP_OVER:
-            txt = Text("DANGER ", style=f"bold {DANGER_COLOR}")
-            txt.append("▼", style="bold red")
+            txt = Text("DANGER ", style=f"bold {DANGER}")
+            txt.append("▼", style=f"bold {NEGATIVE}")
             return txt
         case SignalType.DANGER_DOWN_OVER:
-            txt = Text("DANGER ", style=f"bold {DANGER_COLOR}")
-            txt.append("▲", style="bold green")
+            txt = Text("DANGER ", style=f"bold {DANGER}")
+            txt.append("▲", style=f"bold {POSITIVE}")
             return txt
         case SignalType.WATCH:
-            return Text("WATCH", style="bold cyan")
+            return Text("WATCH", style=f"bold {WATCH}")
 
 
-CSS = """
-Screen {
-    background: $surface;
-}
+CSS = f"""
+Screen {{
+    background: {BG};
+}}
 
-#market-header, #group-header, #stock-header {
+Header {{
+    background: {BG_DEEP};
+    color: {FG_MUTED};
     dock: top;
-    height: 3;
-    background: $primary-background;
+    height: 1;
+}}
+
+Footer {{
+    background: {BG_DEEP};
+    color: {FG_MUTED};
+}}
+
+FooterKey .footer-key--key {{
+    background: {BG_ELEVATED};
+    color: {FG_ACCENT};
+}}
+
+FooterKey .footer-key--description {{
+    color: {FG_MUTED};
+}}
+
+#market-header, #group-header, #stock-header {{
+    dock: top;
+    height: 2;
+    background: {BG_ELEVATED};
     padding: 0 2;
-    content-align: center middle;
-}
+    content-align: left middle;
+    color: {FG_DIM};
+}}
 
-#market-header.bullish, #group-header.bullish { color: $success; }
-#market-header.bearish, #group-header.bearish { color: $error; }
-#market-header.neutral, #group-header.neutral { color: $warning; }
+#market-header.bullish, #group-header.bullish {{ color: {POSITIVE}; }}
+#market-header.bearish, #group-header.bearish {{ color: {NEGATIVE}; }}
+#market-header.neutral, #group-header.neutral {{ color: {NEUTRAL}; }}
 
-#groups-table {
+DataTable {{
+    background: {BG};
+}}
+
+DataTable > .datatable--header {{
+    background: {BG};
+    color: {FG_MUTED};
+    text-style: none;
+}}
+
+DataTable > .datatable--cursor {{
+    background: {BG_CURSOR};
+    color: {FG};
+}}
+
+DataTable > .datatable--hover {{
+    background: {BG_HOVER};
+}}
+
+DataTable > .datatable--even-row {{
+    background: {BG};
+}}
+
+DataTable > .datatable--odd-row {{
+    background: {BG_SUBTLE};
+}}
+
+#groups-table {{
     height: 1fr;
-}
+}}
 
-#map-table {
+#map-table {{
     height: auto;
-}
+}}
 
-#tracked-table {
+#tracked-table {{
     height: auto;
     max-height: 20;
     margin: 0;
-}
+}}
 
-#stock-table {
+#stock-table {{
     height: auto;
-}
+}}
 
-.section-label {
+.section-label {{
     padding: 0 1;
-    text-style: bold;
-    color: $text;
+    color: {FG_MUTED};
     margin: 1 0 0 0;
-}
+}}
+
+VerticalScroll {{
+    scrollbar-color: {FG_FAINT};
+    scrollbar-color-hover: {FG_MUTED};
+    scrollbar-color-active: {FG_ACCENT};
+    scrollbar-background: {BG};
+    scrollbar-background-hover: {BG};
+    scrollbar-background-active: {BG};
+}}
 
 """
 
@@ -143,27 +218,27 @@ def _entry_cells(
     ]
 
 
-_GOLD_START = (238, 207, 115)
-_GOLD_END = (169, 132, 20)
+_KEY_START = KEY_GRAD_START
+_KEY_END = KEY_GRAD_END
 
 
-def _gold_gradient(text: str, offset: int, total: int) -> Text:
+def _key_gradient(text: str, offset: int, total: int) -> Text:
     result = Text()
     for i, ch in enumerate(text):
         t = (offset + i) / max(total - 1, 1)
-        r = int(_GOLD_START[0] + (_GOLD_END[0] - _GOLD_START[0]) * t)
-        g = int(_GOLD_START[1] + (_GOLD_END[1] - _GOLD_START[1]) * t)
-        b = int(_GOLD_START[2] + (_GOLD_END[2] - _GOLD_START[2]) * t)
+        r = int(_KEY_START[0] + (_KEY_END[0] - _KEY_START[0]) * t)
+        g = int(_KEY_START[1] + (_KEY_END[1] - _KEY_START[1]) * t)
+        b = int(_KEY_START[2] + (_KEY_END[2] - _KEY_START[2]) * t)
         result.append(ch, style=f"rgb({r},{g},{b})")
     return result
 
 
-def _gold_row(cells: list[str]) -> list[Text]:
+def _key_row(cells: list[str]) -> list[Text]:
     total = sum(len(c) for c in cells)
     result: list[Text] = []
     offset = 0
     for cell in cells:
-        result.append(_gold_gradient(cell, offset, total))
+        result.append(_key_gradient(cell, offset, total))
         offset += len(cell)
     return result
 
@@ -179,7 +254,7 @@ def _populate_signal_table(
         is_key = source == "KEY"
         if is_key and dim_key:
             gold_cells = [signal.date, source, signal.detail, signal.rule]
-            gold = _gold_row(gold_cells)
+            gold = _key_row(gold_cells)
             table.add_row(
                 gold[0],
                 gold[1],
@@ -199,16 +274,18 @@ def _populate_signal_table(
             )
 
 
+def _trend_marker(trend: GroupTrend) -> Text:
+    if trend == "bullish":
+        return Text("●", style=POSITIVE)
+    if trend == "bearish":
+        return Text("●", style=NEGATIVE)
+    return Text("○", style="dim")
+
+
 def _col_styled(col: Col | None) -> Text:
     if col is None:
         return Text("—", style="dim")
     return Text(col.short, style=INK_STYLES.get(col.ink, "dim"))
-
-
-def _kp_short(state: GroupState) -> str:
-    if state.key_price and state.key_price.engine.current:
-        return state.key_price.engine.current.short
-    return "—"
 
 
 # ── Dashboard Screen ────────────────────────────────────────────────
@@ -240,6 +317,7 @@ class DashboardScreen(Screen):
     def on_mount(self) -> None:
         table = self.query_one("#groups-table", DataTable)
         table.add_columns(
+            "",
             "Group",
             "Leader A",
             "A State",
@@ -250,18 +328,26 @@ class DashboardScreen(Screen):
             "Tracked",
         )
 
-        for i, g in enumerate(self.state.groups):
+        rank = {"bullish": 0, "neutral": 1, "bearish": 2}
+        self._sorted = sorted(
+            self.state.groups,
+            key=lambda g: (rank[group_trend(g)], g.config.name),
+        )
+
+        for i, g in enumerate(self._sorted):
             a, b = group_leaders(g)
             tracked = group_tracked(g)
             trend = group_trend(g)
             t_color = TREND_COLORS[trend]
+            kp_col = g.key_price.engine.current if g.key_price else None
             table.add_row(
+                _trend_marker(trend),
                 g.config.name,
                 a.ticker,
                 _col_styled(a.engine.current),
                 b.ticker,
                 _col_styled(b.engine.current),
-                Text(_kp_short(g), style="bold"),
+                _col_styled(kp_col),
                 Text(trend.upper(), style=f"bold {t_color}"),
                 ", ".join(s.ticker for s in tracked) or "—",
                 key=str(i),
@@ -270,8 +356,8 @@ class DashboardScreen(Screen):
     def action_select_group(self) -> None:
         table = self.query_one("#groups-table", DataTable)
         row = table.cursor_coordinate.row
-        if row < len(self.state.groups):
-            self.app.push_screen(GroupScreen(self.state.groups[row]))
+        if row < len(self._sorted):
+            self.app.push_screen(GroupScreen(self._sorted[row]))
 
 
 # ── Group Screen (18-column Livermore Map) ───────────────────────────
@@ -297,17 +383,7 @@ class GroupScreen(Screen):
 
     def _header_text(self) -> str:
         trend = group_trend(self.state)
-        return f"{self.state.config.name}  —  Key Price: {trend.upper()}"
-
-    def _map_label(self) -> str:
-        a, b = group_leaders(self.state)
-        kp = self.state.key_price
-        pivots = kp.engine.pivots if kp else ()
-        start = trend_boundary(pivots, self._zoom_depth)
-        base = f" {a.ticker} + {b.ticker} — Livermore Map"
-        if start is None:
-            return base
-        return f"{base}  [dim]since {start}[/dim]"
+        return f"{self.state.config.name}  —  {trend.upper()}"
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -317,14 +393,13 @@ class GroupScreen(Screen):
         yield header
 
         with VerticalScroll():
-            yield Label(self._map_label(), id="map-label", classes="section-label")
             yield DataTable(id="map-table", cursor_type="row", zebra_stripes=True, fixed_columns=1)
 
             yield Label(" Signals", classes="section-label")
             yield DataTable(id="signal-table", cursor_type="none", zebra_stripes=True)
 
             if self._tracked:
-                yield Label(" Tracked Stocks", classes="section-label")
+                yield Label(" Tracked", classes="section-label")
                 yield DataTable(
                     id="tracked-table",
                     cursor_type="row",
@@ -346,7 +421,6 @@ class GroupScreen(Screen):
         a, b = group_leaders(self.state)
         self._populate_map(a, b, kp, start)
         self._populate_signals(a, b, kp, start)
-        self.query_one("#map-label", Label).update(self._map_label())
 
     def _map_columns(self, table: DataTable, a: StockState, b: StockState) -> None:
         table.add_column("Date", key="date")
@@ -405,11 +479,9 @@ class GroupScreen(Screen):
             _, _, kp_sigs = _filter_engine(kp.engine, start)
             self._all_signals.extend(("KEY", s) for s in kp_sigs)
 
-        table = self.query_one("#signal-table", DataTable)
-        table.clear(columns=True)
-        _populate_signal_table(table, self._all_signals)
+        self._render_signal_table()
 
-    def _rebuild_signal_table(self) -> None:
+    def _render_signal_table(self) -> None:
         try:
             table = self.query_one("#signal-table", DataTable)
         except NoMatches:
@@ -423,7 +495,7 @@ class GroupScreen(Screen):
 
     def action_toggle_key(self) -> None:
         self._key_visible = not self._key_visible
-        self._rebuild_signal_table()
+        self._render_signal_table()
 
     def _populate_tracked_list(self) -> None:
         table = self.query_one("#tracked-table", DataTable)
@@ -436,7 +508,10 @@ class GroupScreen(Screen):
                 _col_styled(stock.engine.current),
                 str(len(stock.engine.entries)),
                 str(len(stock.engine.pivots)),
-                Text(str(sig_count), style="bold green" if sig_count == 0 else "bold yellow"),
+                Text(
+                    str(sig_count),
+                    style=f"bold {POSITIVE}" if sig_count == 0 else f"bold {NEUTRAL}",
+                ),
                 f"{stock.config.swing:.1f}",
                 key=str(i),
             )
@@ -484,20 +559,13 @@ class StockScreen(Screen):
         super().__init__()
 
     def _header_text(self) -> str:
-        return f"{self.stock.ticker}  —  swing={self.stock.config.swing:.1f}"
-
-    def _zoom_label(self) -> str:
-        start = trend_boundary(self.stock.engine.pivots, self._zoom_depth)
-        if start is None:
-            return ""
-        return f" [dim]since {start}[/dim]"
+        return f"{self.stock.ticker}  —  swing {self.stock.config.swing:.1f}"
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Label(self._header_text(), id="stock-header")
 
         with VerticalScroll():
-            yield Label(self._zoom_label(), id="zoom-label")
             yield DataTable(id="stock-table", cursor_type="row", zebra_stripes=True)
 
             if self.stock.engine.signals:
@@ -522,8 +590,6 @@ class StockScreen(Screen):
             self._populate_signals(signals)
         if self.stock.engine.pivots:
             self._populate_pivots(pivots)
-
-        self.query_one("#zoom-label", Label).update(self._zoom_label())
 
     def _populate_table(
         self,
@@ -553,7 +619,7 @@ class StockScreen(Screen):
         table.add_columns("Date", "Column", "Price", "Underline")
 
         for p in pivots:
-            ul_style = "bold red" if p.underline == "red" else "bold white"
+            ul_style = NEGATIVE if p.underline == "red" else FG
             table.add_row(
                 p.date,
                 p.source_col.short,
@@ -584,12 +650,12 @@ HELP_TEXT = (
     "┌──────────┬──────────────────────────────┬─────────┐\n"
     "│ [bold]Signal[/]   │ [bold]Meaning[/]                      │ [bold]Rules[/]   │\n"
     "├──────────┼──────────────────────────────┼─────────┤\n"
-    "│ [bold cyan]WATCH[/]    │ Approaching pivot            │ 9(a-c)  │\n"
-    "│ [bold green]BUY[/]      │ Confirmed buy                │ 10(a,d) │\n"
-    "│ [bold red]SELL[/]     │ Confirmed sell               │ 10(b,c) │\n"
-    f"│ [bold {DANGER_COLOR}]DANGER[/] [bold red]▼[/]"
+    f"│ [bold {WATCH}]WATCH[/]    │ Approaching pivot            │ 9(a-c)  │\n"
+    f"│ [bold {POSITIVE}]BUY[/]      │ Confirmed buy                │ 10(a,d) │\n"
+    f"│ [bold {NEGATIVE}]SELL[/]     │ Confirmed sell               │ 10(b,c) │\n"
+    f"│ [bold {DANGER}]DANGER[/] [bold {NEGATIVE}]▼[/]"
     " │ Uptrend may be ending        │ 10(e)   │\n"
-    f"│ [bold {DANGER_COLOR}]DANGER[/] [bold green]▲[/]"
+    f"│ [bold {DANGER}]DANGER[/] [bold {POSITIVE}]▲[/]"
     " │ Downtrend may be ending      │ 10(f)   │\n"
     "└──────────┴──────────────────────────────┴─────────┘\n"
     "\n"
@@ -598,8 +664,9 @@ HELP_TEXT = (
     "├──────────┼─────────┼────────────────────────────────────────┤\n"
     "│ [dim]SecRally[/] │ [dim]pencil[/]  │ [dim]Indecisive rally (below last NR)[/]       │\n"
     "│ [dim]NatRally[/] │ [dim]pencil[/]  │ [dim]Rally from decline[/]                     │\n"
-    "│ [bold]UPTREND[/]  │ [bold]black[/]   │ [bold]Confirmed uptrend[/]                      │\n"
-    "│ [bold red]DNTREND[/]  │ [bold red]red[/]     │ [bold red]Confirmed downtrend[/]"
+    f"│ [{POSITIVE}]UPTREND[/]  │ [bold]black[/]   │ [{POSITIVE}]Confirmed uptrend[/]"
+    "                      │\n"
+    f"│ [{NEGATIVE}]DNTREND[/]  │ [{NEGATIVE}]red[/]     │ [{NEGATIVE}]Confirmed downtrend[/]"
     "                    │\n"
     "│ [dim]NatReac[/]  │ [dim]pencil[/]  │ [dim]Reaction from rally[/]                    │\n"
     "│ [dim]SecReac[/]  │ [dim]pencil[/]  │ [dim]Indecisive reaction (above last NREAC)[/] │\n"

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from lafmm.colors import TERM_NEGATIVE, TERM_POSITIVE
+
 BLOCKS = " ▁▂▃▄▅▆▇█"
 
 
-def sparkline(values: Sequence[float], color: str = "green") -> str:
+def sparkline(values: Sequence[float], color: str = TERM_POSITIVE) -> str:
     if not values:
         return ""
     lo, hi = min(values), max(values)
@@ -60,7 +62,7 @@ def horizontal_bars(
     lines: list[str] = []
     for label, value, num in zip(labels, values, val_nums, strict=True):
         bar_len = max(1, round(abs(value) / max_abs * width))
-        color = "green" if value >= 0 else "red"
+        color = TERM_POSITIVE if value >= 0 else TERM_NEGATIVE
         bar = f"[{color}]{'█' * bar_len}[/]"
         pad = " " * (width - bar_len)
         colored = f"[{color}]{num.rjust(val_w)}[/]"
@@ -138,7 +140,7 @@ def _render_value_labels(
     gap = 1
     parts: list[str] = []
     for val in values:
-        color = "green" if val >= 0 else "red"
+        color = TERM_POSITIVE if val >= 0 else TERM_NEGATIVE
         label = _compact_precise(val)
         parts.append(f"[{color}]{label.center(bar_w)}[/]{' ' * gap}")
     lines.append(f"{' ' * (y_w + 2)}{''.join(parts)}")
@@ -165,7 +167,7 @@ def _pos_row(
     parts: list[str] = []
     for v in values:
         eighths = (v / max_p * rows - row) * 8 if v > 0 else 0
-        parts.append(_up_fill(eighths, bw, "green") + " " * gap)
+        parts.append(_up_fill(eighths, bw, TERM_POSITIVE) + " " * gap)
     return "".join(parts)
 
 
@@ -180,7 +182,7 @@ def _neg_row(
     parts: list[str] = []
     for v in values:
         eighths = (abs(v) / max_n * rows - row) * 8 if v < 0 else 0
-        parts.append(_down_fill(eighths, bw, "red") + " " * gap)
+        parts.append(_down_fill(eighths, bw, TERM_NEGATIVE) + " " * gap)
     return "".join(parts)
 
 

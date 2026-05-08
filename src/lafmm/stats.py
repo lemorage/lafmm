@@ -18,9 +18,11 @@ from rich.text import Text
 
 from lafmm.chart import sparkline, vertical_bars
 from lafmm.colors import (
-    NEGATIVE,
-    POSITIVE,
     ROTATION_RICH,
+    TERM_NEGATIVE,
+    TERM_NEUTRAL,
+    TERM_POSITIVE,
+    TERM_WATCH,
     color_by_threshold,
 )
 
@@ -92,15 +94,16 @@ def _header(data: dict, con: Console) -> None:
     months = data.get("monthly_pnl", [])
     cumulative = list(itertools.accumulate(m["pnl"] for m in months))
     ret = data["trading_return_pct"]
-    spark = sparkline(cumulative, "green" if ret >= 0 else "red") if cumulative else ""
+    color = TERM_POSITIVE if ret >= 0 else TERM_NEGATIVE
+    spark = sparkline(cumulative, color) if cumulative else ""
 
     t = Table(box=None, show_header=False, expand=True, padding=(0, 2))
     t.add_column()
     t.add_column(justify="right", no_wrap=True)
 
-    rc = "green" if ret >= 0 else "red"
+    rc = TERM_POSITIVE if ret >= 0 else TERM_NEGATIVE
     pnl = data["total_pnl"]
-    pc = "green" if pnl >= 0 else "red"
+    pc = TERM_POSITIVE if pnl >= 0 else TERM_NEGATIVE
     ps = "+" if pnl >= 0 else "-"
 
     t.add_row(
@@ -125,7 +128,7 @@ def _second_row(data: dict, ret: float, spark: str) -> tuple[Text, Text]:
     spy = data.get("spy_return_pct")
     if spy is not None:
         diff = ret - spy
-        dc = "green" if diff >= 0 else "red"
+        dc = TERM_POSITIVE if diff >= 0 else TERM_NEGATIVE
         return (
             Text.from_markup(f"Equity  {spark}"),
             Text.from_markup(f"[dim]SPY {spy:+.1f}%[/]    [{dc}]vs benchmark {diff:+.1f}%[/]"),
@@ -230,13 +233,13 @@ def _rolling_rows(data: dict) -> list[tuple[str, str, str, str]]:
     avg_win_rate = data.get("win_rate", 0.0)
     avg_expectancy = data.get("expectancy", 0.0)
     avg_profit_factor = data.get("profit_factor", 0.0)
-    expectancy_color = "green" if expectancies[-1] >= 0 else "red"
+    expectancy_color = TERM_POSITIVE if expectancies[-1] >= 0 else TERM_NEGATIVE
     profit_factor_color = _pf_color(profit_factors[-1])
 
     return [
         (
             "Win Rate",
-            sparkline(win_rates, "cyan"),
+            sparkline(win_rates, TERM_WATCH),
             f"[cyan]{win_rates[-1]:.0f}%[/]",
             f"avg {avg_win_rate:.0f}%",
         ),
@@ -300,11 +303,11 @@ def _monthly(data: dict, con: Console) -> None:
 
 
 WIN_RATE_GOOD = 60
-WIN_RATE_NEUTRAL = 50
+WIN_RATE_TERM_NEUTRAL = 50
 
 
 def _win_rate_color(rate: float) -> str:
-    return color_by_threshold(rate, good=WIN_RATE_GOOD, neutral=WIN_RATE_NEUTRAL)
+    return color_by_threshold(rate, good=WIN_RATE_GOOD, neutral=WIN_RATE_TERM_NEUTRAL)
 
 
 # ── Top symbols ─────────────────────────────────────────────────────
@@ -340,7 +343,7 @@ def _symbols(data: dict, con: Console) -> None:
     conc = data.get("concentration_pct", 0.0)
     footer = ""
     if conc > 0 and symbols:
-        style = "red" if conc > 50 else ("yellow" if conc > 30 else "dim")
+        style = TERM_NEGATIVE if conc > 50 else (TERM_NEUTRAL if conc > 30 else "dim")
         footer = f"\n  [{style}]{conc:.0f}% concentration in {symbols[0]['symbol']}[/]"
 
     content = Group(t, Text.from_markup(footer)) if footer else t
@@ -417,8 +420,8 @@ REGIME_LABELS: dict[str, str] = {
 }
 
 REGIME_COLORS: dict[str, str] = {
-    "RISK_ON": POSITIVE,
-    "RISK_OFF": NEGATIVE,
+    "RISK_ON": TERM_POSITIVE,
+    "RISK_OFF": TERM_NEGATIVE,
     "?": "dim",
 }
 
@@ -640,10 +643,10 @@ def _render_genome(data: dict, con: Console) -> None:
 
     parts = _build_axis_parts(buckets, max(40, con.width - 12))
     edge, leak = _render_edge_and_leak(buckets)
-    parts.append(Text.from_markup(f"  [bold {POSITIVE}]Edge[/]"))
+    parts.append(Text.from_markup(f"  [bold {TERM_POSITIVE}]Edge[/]"))
     parts.append(edge)
     parts.append(Text(""))
-    parts.append(Text.from_markup(f"  [bold {NEGATIVE}]Leak[/]"))
+    parts.append(Text.from_markup(f"  [bold {TERM_NEGATIVE}]Leak[/]"))
     parts.append(leak)
 
     con.print(
@@ -660,17 +663,17 @@ def _pf_color(profit_factor: float) -> str:
 
 def _pnl(v: float) -> str:
     if v > 0:
-        return f"[{POSITIVE}]+${v:,.2f}[/]"
+        return f"[{TERM_POSITIVE}]+${v:,.2f}[/]"
     if v < 0:
-        return f"[{NEGATIVE}]-${abs(v):,.2f}[/]"
+        return f"[{TERM_NEGATIVE}]-${abs(v):,.2f}[/]"
     return "$0.00"
 
 
 def _pct(v: float) -> str:
     if v > 0:
-        return f"[{POSITIVE}]+{v:.1f}%[/]"
+        return f"[{TERM_POSITIVE}]+{v:.1f}%[/]"
     if v < 0:
-        return f"[{NEGATIVE}]{v:.1f}%[/]"
+        return f"[{TERM_NEGATIVE}]{v:.1f}%[/]"
     return "0.0%"
 
 

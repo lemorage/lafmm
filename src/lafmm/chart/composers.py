@@ -10,7 +10,7 @@ from lafmm.chart.styles import (
     HistogramSeries,
     LineSeries,
 )
-from lafmm.colors import ROTATION_ANSI
+from lafmm.colors import ROTATION_ANSI, TERM_NEGATIVE, TERM_NEUTRAL, TERM_POSITIVE, TERM_WATCH
 from lafmm.indicators import (
     adx,
     bollinger,
@@ -35,7 +35,7 @@ def line_chart(
     *,
     width: int = 80,
     height: int = 20,
-    color: str = "green",
+    color: str = TERM_POSITIVE,
     title: str = "",
     x_labels: Sequence[str] = (),
 ) -> str:
@@ -105,8 +105,8 @@ def macd_chart(
                 Pane(
                     series=(
                         HistogramSeries(ys=tuple(hist), dual_color=True, label="Hist"),
-                        LineSeries(ys=tuple(ml), color="cyan", label="MACD"),
-                        LineSeries(ys=tuple(sl), color="yellow", label="Signal"),
+                        LineSeries(ys=tuple(ml), color=TERM_WATCH, label="MACD"),
+                        LineSeries(ys=tuple(sl), color=TERM_NEUTRAL, label="Signal"),
                     ),
                     height_weight=1,
                     hlines=(HLine(0.0, label="Zero"),),
@@ -141,7 +141,10 @@ def rsi_chart(
                     series=(LineSeries(ys=tuple(rsi_vals), color="magenta", label="RSI"),),
                     height_weight=1,
                     y_range=(0.0, 100.0),
-                    hlines=(HLine(70.0, "red", label="OB 70"), HLine(30.0, "green", label="OS 30")),
+                    hlines=(
+                        HLine(70.0, TERM_NEGATIVE, label="OB 70"),
+                        HLine(30.0, TERM_POSITIVE, label="OS 30"),
+                    ),
                 ),
             ),
             width=width,
@@ -197,9 +200,9 @@ def bollinger_chart(
                 Pane(
                     series=(
                         LineSeries(ys=tuple(closes), color="white", label="Close"),
-                        LineSeries(ys=tuple(mid), color="yellow", label=f"SMA({period})"),
-                        LineSeries(ys=tuple(upper), color="cyan", label="Upper"),
-                        LineSeries(ys=tuple(lower), color="cyan", label="Lower"),
+                        LineSeries(ys=tuple(mid), color=TERM_NEUTRAL, label=f"SMA({period})"),
+                        LineSeries(ys=tuple(upper), color=TERM_WATCH, label="Upper"),
+                        LineSeries(ys=tuple(lower), color=TERM_WATCH, label="Lower"),
                     ),
                 ),
             ),
@@ -233,12 +236,15 @@ def stochastic_chart(
                 ),
                 Pane(
                     series=(
-                        LineSeries(ys=tuple(k_line), color="cyan", label=f"%K({k_period})"),
-                        LineSeries(ys=tuple(d_line), color="yellow", label=f"%D({d_period})"),
+                        LineSeries(ys=tuple(k_line), color=TERM_WATCH, label=f"%K({k_period})"),
+                        LineSeries(ys=tuple(d_line), color=TERM_NEUTRAL, label=f"%D({d_period})"),
                     ),
                     height_weight=1,
                     y_range=(0.0, 100.0),
-                    hlines=(HLine(80.0, "red", label="OB 80"), HLine(20.0, "green", label="OS 20")),
+                    hlines=(
+                        HLine(80.0, TERM_NEGATIVE, label="OB 80"),
+                        HLine(20.0, TERM_POSITIVE, label="OS 20"),
+                    ),
                 ),
             ),
             width=width,
@@ -270,7 +276,7 @@ def adx_chart(
                 ),
                 Pane(
                     series=(
-                        LineSeries(ys=tuple(adx_vals), color="yellow", label=f"ADX({period})"),
+                        LineSeries(ys=tuple(adx_vals), color=TERM_NEUTRAL, label=f"ADX({period})"),
                     ),
                     height_weight=1,
                     hlines=(HLine(25.0, "gray", label="Trend 25"),),
@@ -304,12 +310,14 @@ def williams_r_chart(
                     height_weight=3,
                 ),
                 Pane(
-                    series=(LineSeries(ys=tuple(wr_vals), color="cyan", label=f"%R({period})"),),
+                    series=(
+                        LineSeries(ys=tuple(wr_vals), color=TERM_WATCH, label=f"%R({period})"),
+                    ),
                     height_weight=1,
                     y_range=(-100.0, 0.0),
                     hlines=(
-                        HLine(-20.0, "red", label="OB -20"),
-                        HLine(-80.0, "green", label="OS -80"),
+                        HLine(-20.0, TERM_NEGATIVE, label="OB -20"),
+                        HLine(-80.0, TERM_POSITIVE, label="OS -80"),
                     ),
                 ),
             ),
@@ -342,12 +350,12 @@ def cci_chart(
                 ),
                 Pane(
                     series=(
-                        LineSeries(ys=tuple(cci_vals), color="yellow", label=f"CCI({period})"),
+                        LineSeries(ys=tuple(cci_vals), color=TERM_NEUTRAL, label=f"CCI({period})"),
                     ),
                     height_weight=1,
                     hlines=(
-                        HLine(100.0, "red", label="OB +100"),
-                        HLine(-100.0, "green", label="OS -100"),
+                        HLine(100.0, TERM_NEGATIVE, label="OB +100"),
+                        HLine(-100.0, TERM_POSITIVE, label="OS -100"),
                         HLine(0.0),
                     ),
                 ),
@@ -378,7 +386,7 @@ def obv_chart(
                     height_weight=3,
                 ),
                 Pane(
-                    series=(LineSeries(ys=tuple(obv_vals), color="cyan", label="OBV"),),
+                    series=(LineSeries(ys=tuple(obv_vals), color=TERM_WATCH, label="OBV"),),
                     height_weight=1,
                 ),
             ),
@@ -408,7 +416,7 @@ def vwap_chart(
                 Pane(
                     series=(
                         LineSeries(ys=tuple(closes), color="white", label="Close"),
-                        LineSeries(ys=tuple(vwap_vals), color="yellow", label="VWAP"),
+                        LineSeries(ys=tuple(vwap_vals), color=TERM_NEUTRAL, label="VWAP"),
                     ),
                 ),
             ),
@@ -453,7 +461,9 @@ def volume_chart(
                     height_weight=1,
                 ),
                 Pane(
-                    series=(LineSeries(ys=tuple(rvol), color="yellow", label=f"RVOL({period})"),),
+                    series=(
+                        LineSeries(ys=tuple(rvol), color=TERM_NEUTRAL, label=f"RVOL({period})"),
+                    ),
                     height_weight=0.5,
                     hlines=(HLine(1.0, "gray", label="Avg"),),
                 ),
@@ -468,5 +478,6 @@ def volume_chart(
 
 def _volume_colors(closes: Sequence[float]) -> tuple[str, ...]:
     return tuple(
-        "green" if i == 0 or closes[i] >= closes[i - 1] else "red" for i in range(len(closes))
+        TERM_POSITIVE if i == 0 or closes[i] >= closes[i - 1] else TERM_NEGATIVE
+        for i in range(len(closes))
     )

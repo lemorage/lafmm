@@ -5,7 +5,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from lafmm.colors import NEGATIVE, NEUTRAL, POSITIVE
+from lafmm.colors import FG, NEGATIVE, NEUTRAL, POSITIVE, WATCH
 from lafmm.group import group_leaders, group_tracked, group_trend, market_trend
 from lafmm.models import (
     COL_ORDER,
@@ -22,8 +22,8 @@ from lafmm.models import (
 )
 
 INK_STYLES: dict[str, str] = {
-    "black": f"bold {POSITIVE}",
-    "red": f"bold {NEGATIVE}",
+    "black": POSITIVE,
+    "red": NEGATIVE,
     "pencil": "dim",
 }
 
@@ -32,7 +32,7 @@ SIGNAL_STYLES: dict[SignalType, tuple[str, str]] = {
     SignalType.SELL: (f"bold {NEGATIVE}", "SELL"),
     SignalType.DANGER_UP_OVER: (f"bold {NEUTRAL}", "DANGER: Up Over"),
     SignalType.DANGER_DOWN_OVER: (f"bold {NEUTRAL}", "DANGER: Dn Over"),
-    SignalType.WATCH: ("bold cyan", "WATCH"),
+    SignalType.WATCH: (f"bold {WATCH}", "WATCH"),
 }
 
 TREND_STYLES: dict[GroupTrend, tuple[str, str]] = {
@@ -67,7 +67,7 @@ def format_price(
     txt = Text(f"{price:>8.2f}", style=style)
     for pivot in pivots:
         if pivot.source_col is col and pivot.price == price:
-            ul_color = "red" if pivot.underline == "red" else "bright_white"
+            ul_color = NEGATIVE if pivot.underline == "red" else FG
             txt.stylize(f"underline {ul_color}")
             break
     return txt
@@ -80,7 +80,7 @@ def _render_main_table(
 ) -> None:
     title = f"Livermore Market Key — {cfg.ticker}" if cfg.ticker else "Livermore Market Key"
     table = Table(title=title, box=box.SIMPLE_HEAVY, show_lines=True)
-    table.add_column("Date", style="cyan", width=12)
+    table.add_column("Date", style=WATCH, width=12)
     for col in COL_ORDER:
         table.add_column(col.short, justify="right", width=12)
 
@@ -98,13 +98,13 @@ def _render_main_table(
 
 def _render_pivot_table(pivots: Sequence[PivotalPoint], console: Console) -> None:
     table = Table(title="Pivotal Points", box=box.ROUNDED)
-    table.add_column("Date", style="cyan")
+    table.add_column("Date", style=WATCH)
     table.add_column("Column")
     table.add_column("Price", justify="right")
     table.add_column("Underline")
 
     for p in pivots:
-        ul_style = "bold red" if p.underline == "red" else "bold white"
+        ul_style = f"bold {NEGATIVE}" if p.underline == "red" else f"bold {FG}"
         table.add_row(
             p.date,
             p.source_col.short,
@@ -117,7 +117,7 @@ def _render_pivot_table(pivots: Sequence[PivotalPoint], console: Console) -> Non
 
 def _render_signal_table(signals: Sequence[Signal], console: Console) -> None:
     table = Table(title="Trading Signals", box=box.ROUNDED)
-    table.add_column("Date", style="cyan")
+    table.add_column("Date", style=WATCH)
     table.add_column("Signal")
     table.add_column("Price", justify="right")
     table.add_column("Rule")
@@ -178,7 +178,7 @@ def _render_livermore_map(
 ) -> None:
     title = f"{a.ticker} + {b.ticker} — Livermore Map (18 columns)"
     table = Table(title=title, box=box.SIMPLE_HEAVY, show_lines=True)
-    table.add_column("Date", style="cyan", width=12)
+    table.add_column("Date", style=WATCH, width=12)
 
     for col in COL_ORDER:
         table.add_column(f"{a.ticker}\n{col.short}", justify="right", width=9)
@@ -295,7 +295,7 @@ def _render_group_detail(state: GroupState, console: Console) -> None:
 
 def _render_stock_mini(stock: StockState, title: str, console: Console) -> None:
     table = Table(title=title, box=box.SIMPLE, show_lines=False, pad_edge=False)
-    table.add_column("Date", style="cyan", width=12)
+    table.add_column("Date", style=WATCH, width=12)
     for col in COL_ORDER:
         table.add_column(col.short, justify="right", width=10)
 
