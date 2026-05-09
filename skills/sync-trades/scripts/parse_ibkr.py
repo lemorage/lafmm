@@ -454,7 +454,7 @@ def main() -> None:
     account_dir = Path(sys.argv[2])
     journal_dir = account_dir / "journal"
     capital_dir = account_dir / "capital"
-    cache_dir = account_dir.parent / "cache"
+    cache_dir = account_dir.parent.parent / "cache"
 
     signals = load_signal_index(cache_dir)
     tracked_since = _read_tracked_since(account_dir)
