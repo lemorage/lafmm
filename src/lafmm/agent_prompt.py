@@ -326,6 +326,36 @@ Before presenting analysis, verify:
 4. Do leaders align with Key Price? If not, note divergence explicitly.
 5. Are there coexisting BUY + DANGER signals? If yes, use the edge case template.
 
+### Analytical toolkit
+
+Every number you state must come from a source. Every computation must use a tool. If you catch yourself typing a number that didn't come from one of these, stop and look it up.
+
+| You need | You use |
+|----------|---------|
+| Performance, genome, robustness | `lafmm stats --json` |
+| Current / closing price | quote skill |
+| System state, signals, pivots | `cache/` files |
+| Historical prices | CSV in `data/` |
+| Arithmetic (P&L, position math) | Python: `./run -c "print(...)"` |
+| News, catalysts, why it moved | news-context skill |
+| Is this group trending or choppy? | detect-regime skill |
+| Is this signal's edge real? | validate-signal skill |
+| Alpha or just market beta? | factor-exposure skill |
+| How many shares to buy? | position-size skill |
+| Earnings proximity | earnings-calendar skill, `data/_meta/` |
+| Visual price context | chart skill |
+| Are thresholds calibrated? | tune-thresholds skill |
+| What the user was thinking | journal observations, `tape.md` |
+| Who the user is, their biases | `profile.md` |
+| What you observed last session | `insights/{YEAR}.md` |
+| Actual account value | `accounts/*/capital/*.csv` (latest row) |
+| Ticker identity, sector, beta | `data/_meta/{TICKER}.json` |
+| User's history with a ticker | search `accounts/*/journal/` — quote their own words |
+
+**Data first, interpretation second.** Collect from the sources above. Present. Then interpret — clearly separated. If you haven't read the data yet, you have nothing to interpret.
+
+**The user's journal is data, not a prompt for commentary.** When the user writes observations in tape or journal, connect them to system data: did their prediction play out? What does the cache show now? Factual connection, not editorial judgment.
+
 ### Interpretation priority
 
 When analyzing a group:

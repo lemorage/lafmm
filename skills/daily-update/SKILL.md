@@ -35,8 +35,9 @@ list. Fetch closing prices for each ticker using the fetch script.
 See `references/fetch-prices.md` for the command and options.
 
 Run all tickers, leaders and tracked stocks across all groups.
-The script is idempotent, so fetching a ticker that's already current
-is a no-op.
+Parallelize by group: one subagent per group, each fetching its
+tickers. The script is idempotent, so fetching a ticker that's
+already current is a no-op.
 
 ### 3. Sync cache
 
@@ -47,38 +48,46 @@ new signals, column transitions, or pivotal points.
 
 ### 4. Summarize changes
 
-This is the core value of the daily update. Not the mechanical steps
-above, but telling the user what matters.
+Ground the summary in data before interpreting.
 
-Read `cache/market.md` and each `cache/{group}/group.md`. Compare with
-what you know from the previous session (or from the signal history in
-the cached files). Surface:
+**Data pass.** Collect from these sources:
 
-- **New signals** — any BUY, SELL, DANGER, or WATCH signals that fired
-  today. Lead with these — they're the most actionable.
-- **Column transitions** — any stock or Key Price that changed columns.
-  A move from UT to NR is different from a move from NR to NREAC.
-  Name the transition, not just the destination.
-- **Market trend changes** — did the overall market trend shift? If
-  multiple groups transitioned in the same direction, flag it.
-- **Trade alignment** — if trades were imported in step 1, compare
-  them to the signals. Did the user's trades follow Livermore signals
-  or were they discretionary? This is a factual observation, not a
-  judgment.
+- `cache/market.md` for market trend and group summary
+- Each `cache/{group}/group.md` for signals and column transitions
+  (compare signal dates to the most recent trading day in the data)
+- `lafmm stats --json` for current metrics, open positions, genome
+- Quote skill for current prices on any open position tickers
+- Journal entries from step 1, with their signal column
+  (auto-filled by the parse script)
+- `tape.md` if pending entries exist, attach to matching journal
+  dates and clear them before proceeding
+- `insights/{YEAR}.md` for last session's observations as
+  comparison baseline
+- For any significant move (5%+ daily, Key Price reversal, DANGER
+  fired), run news-context skill to identify catalysts
 
-Keep the summary concise. The user can drill into any group by reading
-the full cache files.
+**Present.** In this order, skip sections with nothing to report:
 
-### 5. Flag surprises (optional)
+1. Signals. DANGER first (always prominent), then BUY/SELL with
+   rule citations, resumption vs reversal distinguished
+2. Transitions. Name them explicitly ("UT → NR", not "now in NR")
+3. Market trend, if the bullish/bearish group count shifted
+4. Trade alignment. Today's trades with their signal column from
+   the journal. System-aligned or discretionary. No judgment.
+5. Open positions. Entry from journal, current from quote,
+   unrealized computed in Python. System state from cache.
+6. Performance delta. Key metrics from `lafmm stats --json` vs
+   last session (return, win rate, Sharpe, post-system record).
+   Note robustness (ex-best ticker expectancy).
+7. News catalysts, only for significant moves flagged above
 
-If something unexpected happened (a stock dropped 5%+ in a day, a Key
-Price reversed from confirmed trend, multiple DANGER signals fired
-across groups), use the news-context skill to check for explanations.
+**Interpret.** After all data is presented, 2-4 sentences
+connecting it. Anchor every claim to something from the data pass.
+Cross-sector patterns, concentration observations, approaching
+pivots. No risk lectures. No imperative mood. The user reads and
+decides.
 
-Only do this when the data shows something that warrants investigation,
-not on every daily update.
-
-### 6. Record observations (optional)
+### 5. Record observations (optional)
 
 If you notice a behavioral pattern over multiple sessions (consistent
 trading against signals, ignoring DANGER alerts, over-concentrating in
@@ -98,7 +107,7 @@ Step 4 is the deliverable — present the summary clearly and pause.
 The user may want to drill into specific groups, ask about specific
 signals, or discuss what to do next.
 
-Steps 5-6 happen only when warranted — use your judgment.
+Step 5 happens only when warranted — use your judgment.
 
 ## When data is stale
 
