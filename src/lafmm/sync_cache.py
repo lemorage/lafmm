@@ -73,8 +73,8 @@ def _render_stock_md(stock: StockState) -> str:
         f"## {stock.ticker} — as of {latest}",
         "",
         f"**Column: {_col_label(stock)}**"
-        f" | Swing: {stock.config.swing:.1f}"
-        f" | Confirm: {stock.config.confirm:.1f}",
+        f" | Swing: {stock.config.swing}{'%' if stock.config.percentage else ''}"
+        f" | Confirm: {stock.config.confirm}{'%' if stock.config.percentage else ''}",
         "",
         "### Sheet Summary",
         f"{len(e.entries)} entries, {len(e.pivots)} pivotal points, {len(e.signals)} signals",

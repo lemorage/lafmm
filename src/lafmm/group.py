@@ -64,10 +64,11 @@ def init_stock(
     first_date: str,
     first_price: float,
     swing_pct: float,
+    confirm_pct: float,
     start_col: Col,
     is_leader: bool,
 ) -> StockState:
-    cfg = EngineConfig.for_stock_pct(ticker, first_price, swing_pct)
+    cfg = EngineConfig.for_stock_pct(ticker, swing_pct, confirm_pct)
     engine = start(start_col, first_date, first_price)
     return StockState(ticker=ticker, config=cfg, engine=engine, is_leader=is_leader)
 
@@ -110,6 +111,7 @@ def init_group(
             first_date,
             first_price,
             config.swing_pct,
+            config.confirm_pct,
             config.start_col,
             is_leader,
         )

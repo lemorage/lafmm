@@ -128,6 +128,7 @@ class EngineConfig:
     swing: float = 6.0
     confirm: float = 3.0
     ticker: str = ""
+    percentage: bool = False
 
     def __post_init__(self) -> None:
         if self.swing <= 0:
@@ -136,6 +137,12 @@ class EngineConfig:
             raise ValueError(f"confirm must be positive, got {self.confirm}")
         if self.confirm >= self.swing:
             raise ValueError(f"confirm ({self.confirm}) must be < swing ({self.swing})")
+
+    def swing_at(self, price: float) -> float:
+        return price * self.swing / 100.0 if self.percentage else self.swing
+
+    def confirm_at(self, price: float) -> float:
+        return price * self.confirm / 100.0 if self.percentage else self.confirm
 
     @classmethod
     def for_key_price(cls, ticker: str = "KEY") -> EngineConfig:
@@ -146,9 +153,13 @@ class EngineConfig:
         return cls(swing=swing, confirm=swing / 2.0, ticker=ticker)
 
     @classmethod
-    def for_stock_pct(cls, ticker: str, price: float, swing_pct: float = 5.0) -> EngineConfig:
-        swing = price * swing_pct / 100.0
-        return cls(swing=swing, confirm=swing / 2.0, ticker=ticker)
+    def for_stock_pct(
+        cls,
+        ticker: str,
+        swing_pct: float = 5.0,
+        confirm_pct: float = 2.5,
+    ) -> EngineConfig:
+        return cls(swing=swing_pct, confirm=confirm_pct, ticker=ticker, percentage=True)
 
 
 # ── Immutable Engine State ───────────────────────────────────────────

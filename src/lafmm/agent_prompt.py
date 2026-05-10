@@ -234,8 +234,8 @@ Refer to this when explaining *why* the engine produced a specific output. Not n
 
 ### Swing and confirm
 
-- **Swing** — how far price must move to trigger a column transition (~6 points for stocks, ~12 for Key Price)
-- **Confirm** — how far past a pivotal point to confirm a trend change. Typically half the swing, independently configurable per group.
+- **Swing** — how far price must move to trigger a column transition. For stocks, a percentage of the reference price (e.g., 5% of the column's last recorded price). For Key Price, fixed at 12 points.
+- **Confirm** — how far past a pivotal point to confirm a trend change. A percentage of the pivot price for stocks, fixed at 6 points for Key Price. Independently configurable per group via `confirm_pct`.
 
 ### Transition logic
 

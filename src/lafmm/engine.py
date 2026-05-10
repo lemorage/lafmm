@@ -123,7 +123,7 @@ def _from_ut(state: EngineState, cfg: EngineConfig, date: str, price: float) -> 
         return state
 
     # Rule 6(a): reaction from UT
-    if lp - price >= cfg.swing:
+    if lp - price >= cfg.swing_at(lp):
         state = _mark_pivot(state, date, Col.UT, "red")  # Rule 4(a)
         return replace(_record(state, date, price, Col.NREAC), nreac_trough=price)
 
@@ -140,7 +140,7 @@ def _from_dt(state: EngineState, cfg: EngineConfig, date: str, price: float) -> 
         return state
 
     # Rule 6(c): rally from DT
-    if price - lp >= cfg.swing:
+    if price - lp >= cfg.swing_at(lp):
         state = _mark_pivot(state, date, Col.DT, "black")  # Rule 4(c)
         return replace(_record(state, date, price, Col.NR), nr_peak=price)
 
@@ -166,11 +166,11 @@ def _from_nr(state: EngineState, cfg: EngineConfig, date: str, price: float) -> 
 
     # Priority 2 — Rule 5(a): pivot confirmation to UT
     nr_piv = _find_pivot(state, Col.NR, "black")
-    if nr_piv is not None and price >= nr_piv.price + cfg.confirm:
+    if nr_piv is not None and price >= nr_piv.price + cfg.confirm_at(nr_piv.price):
         return _record(state, date, price, Col.UT)
 
     # Priority 3 — Reaction of ~swing: leave NR
-    if lp - price >= cfg.swing:
+    if lp - price >= cfg.swing_at(lp):
         state = _mark_pivot(state, date, Col.NR, "black")  # Rule 4(d)
 
         # 3a — Rule 6(b) override: below last DT
@@ -210,11 +210,11 @@ def _from_nreac(state: EngineState, cfg: EngineConfig, date: str, price: float) 
 
     # Priority 2 — Rule 5(b): pivot confirmation to DT
     nreac_piv = _find_pivot(state, Col.NREAC, "red")
-    if nreac_piv is not None and price <= nreac_piv.price - cfg.confirm:
+    if nreac_piv is not None and price <= nreac_piv.price - cfg.confirm_at(nreac_piv.price):
         return _record(state, date, price, Col.DT)
 
     # Priority 3 — Rally of ~swing: leave NREAC
-    if price - lp >= cfg.swing:
+    if price - lp >= cfg.swing_at(lp):
         state = _mark_pivot(state, date, Col.NREAC, "red")  # Rule 4(b)
 
         # 3a — Rule 6(d) override: above last UT
@@ -256,7 +256,7 @@ def _from_sr(state: EngineState, cfg: EngineConfig, date: str, price: float) -> 
         return replace(_record(state, date, price, Col.NR), nr_peak=price)
 
     # Reaction from SR: swing-sized drop
-    if lp - price >= cfg.swing:
+    if lp - price >= cfg.swing_at(lp):
         last_dt = state.last[Col.DT]
 
         if last_dt is not None and price < last_dt:
@@ -288,7 +288,7 @@ def _from_sreac(state: EngineState, cfg: EngineConfig, date: str, price: float) 
         return replace(_record(state, date, price, Col.NREAC), nreac_trough=price)
 
     # Rally from SREAC: swing-sized rise
-    if price - lp >= cfg.swing:
+    if price - lp >= cfg.swing_at(lp):
         last_ut = state.last[Col.UT]
 
         if last_ut is not None and price > last_ut:
@@ -329,7 +329,7 @@ def _check_9a(state: EngineState, cfg: EngineConfig, date: str, price: float) ->
     if state.current in (Col.UT, Col.DT):
         return state
     piv = _find_pivot(state, Col.DT, "black")
-    if piv is None or abs(price - piv.price) > cfg.confirm:
+    if piv is None or abs(price - piv.price) > cfg.confirm_at(piv.price):
         return state
     return _emit(
         state,
@@ -346,7 +346,7 @@ def _check_9b(state: EngineState, cfg: EngineConfig, date: str, price: float) ->
     if state.current not in (Col.NR, Col.SR):
         return state
     piv = _find_pivot(state, Col.NR, "black")
-    if piv is None or abs(price - piv.price) > cfg.confirm:
+    if piv is None or abs(price - piv.price) > cfg.confirm_at(piv.price):
         return state
     return _emit(
         state,
@@ -363,7 +363,7 @@ def _check_9c_ut(state: EngineState, cfg: EngineConfig, date: str, price: float)
     if state.current in (Col.UT, Col.DT):
         return state
     piv = _find_pivot(state, Col.UT, "red")
-    if piv is None or abs(price - piv.price) > cfg.confirm:
+    if piv is None or abs(price - piv.price) > cfg.confirm_at(piv.price):
         return state
     return _emit(
         state,
@@ -385,7 +385,7 @@ def _check_9c_nreac(
     if state.current not in (Col.NREAC, Col.SREAC):
         return state
     piv = _find_pivot(state, Col.NREAC, "red")
-    if piv is None or abs(price - piv.price) > cfg.confirm:
+    if piv is None or abs(price - piv.price) > cfg.confirm_at(piv.price):
         return state
     return _emit(
         state,
@@ -402,15 +402,16 @@ def _check_10a(state: EngineState, cfg: EngineConfig, date: str, price: float) -
     if state.current is not Col.UT:
         return state
     piv = _find_pivot(state, Col.UT, "red")
-    if piv is None or price < piv.price + cfg.confirm:
+    if piv is None or price < piv.price + cfg.confirm_at(piv.price):
         return state
+    confirm = cfg.confirm_at(piv.price)
     return _emit(
         state,
         date,
         SignalType.BUY,
         price,
         "10(a)",
-        f"UT resumed: ${price:.2f} >= pivot ${piv.price:.2f} + confirm ${cfg.confirm:.1f}",
+        f"UT resumed: ${price:.2f} >= pivot ${piv.price:.2f} + confirm ${confirm:.1f}",
         pivot_ref=piv,
     )
 
@@ -419,15 +420,16 @@ def _check_10c(state: EngineState, cfg: EngineConfig, date: str, price: float) -
     if state.current is not Col.DT:
         return state
     piv = _find_pivot(state, Col.DT, "black")
-    if piv is None or price > piv.price - cfg.confirm:
+    if piv is None or price > piv.price - cfg.confirm_at(piv.price):
         return state
+    confirm = cfg.confirm_at(piv.price)
     return _emit(
         state,
         date,
         SignalType.SELL,
         price,
         "10(c)",
-        f"DT resumed: ${price:.2f} <= pivot ${piv.price:.2f} - confirm ${cfg.confirm:.1f}",
+        f"DT resumed: ${price:.2f} <= pivot ${piv.price:.2f} - confirm ${confirm:.1f}",
         pivot_ref=piv,
     )
 
@@ -436,15 +438,16 @@ def _check_10b(state: EngineState, cfg: EngineConfig, date: str, price: float) -
     if state.current not in (Col.NREAC, Col.DT):
         return state
     piv = _find_pivot(state, Col.UT, "red")
-    if piv is None or price > piv.price - cfg.confirm:
+    if piv is None or price > piv.price - cfg.confirm_at(piv.price):
         return state
+    confirm = cfg.confirm_at(piv.price)
     return _emit(
         state,
         date,
         SignalType.SELL,
         price,
         "10(b)",
-        f"UT failed: ${price:.2f} broke ${cfg.confirm:.1f}+ below UT pivot ${piv.price:.2f}",
+        f"UT failed: ${price:.2f} broke ${confirm:.1f}+ below UT pivot ${piv.price:.2f}",
         pivot_ref=piv,
     )
 
@@ -453,15 +456,16 @@ def _check_10d(state: EngineState, cfg: EngineConfig, date: str, price: float) -
     if state.current not in (Col.NR, Col.UT):
         return state
     piv = _find_pivot(state, Col.DT, "black")
-    if piv is None or price < piv.price + cfg.confirm:
+    if piv is None or price < piv.price + cfg.confirm_at(piv.price):
         return state
+    confirm = cfg.confirm_at(piv.price)
     return _emit(
         state,
         date,
         SignalType.BUY,
         price,
         "10(d)",
-        f"DT failed: ${price:.2f} broke ${cfg.confirm:.1f}+ above DT pivot ${piv.price:.2f}",
+        f"DT failed: ${price:.2f} broke ${confirm:.1f}+ above DT pivot ${piv.price:.2f}",
         pivot_ref=piv,
     )
 
@@ -473,12 +477,13 @@ def _check_10e(state: EngineState, cfg: EngineConfig, date: str, price: float) -
     if ut_piv is None or state.nr_peak is None:
         return state
 
+    confirm = cfg.confirm_at(ut_piv.price)
     gap = ut_piv.price - state.nr_peak
-    if gap <= 0 or gap > cfg.confirm:
+    if gap <= 0 or gap > confirm:
         return state
 
     drop = state.nr_peak - price
-    if drop < cfg.confirm:
+    if drop < confirm:
         return state
 
     return _emit(
@@ -503,12 +508,13 @@ def _check_10f(state: EngineState, cfg: EngineConfig, date: str, price: float) -
     if dt_piv is None or state.nreac_trough is None:
         return state
 
+    confirm = cfg.confirm_at(dt_piv.price)
     gap = state.nreac_trough - dt_piv.price
-    if gap <= 0 or gap > cfg.confirm:
+    if gap <= 0 or gap > confirm:
         return state
 
     rise = price - state.nreac_trough
-    if rise < cfg.confirm:
+    if rise < confirm:
         return state
 
     return _emit(

@@ -166,7 +166,8 @@ def render_group_sheet(
     tracked = group_tracked(state)
     for stock in tracked:
         con.print()
-        title = f"{stock.ticker} (tracked) — swing={stock.config.swing:.1f}"
+        pct = "%" if stock.config.percentage else ""
+        title = f"{stock.ticker} (tracked) — swing={stock.config.swing}{pct}"
         _render_stock_mini(stock, title, con)
 
 
@@ -289,7 +290,8 @@ def _render_group_detail(state: GroupState, console: Console) -> None:
 
     for stock in state.stocks:
         role = "leader" if stock.is_leader else "tracked"
-        title = f"{stock.ticker} ({role}) — swing={stock.config.swing:.1f}"
+        pct = "%" if stock.config.percentage else ""
+        title = f"{stock.ticker} ({role}) — swing={stock.config.swing}{pct}"
         _render_stock_mini(stock, title, console)
 
 

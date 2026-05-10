@@ -523,7 +523,7 @@ All types are `frozen=True, slots=True`. No mutation anywhere.
 | `Entry` | date, price, col | One row in the recording sheet |
 | `PivotalPoint` | date, price, source_col, underline | A price with red or black underline |
 | `Signal` | date, signal_type, price, rule, detail, pivot_ref | Advisory trading signal |
-| `EngineConfig` | swing, confirm, ticker | Thresholds. Factories: `for_stock()`, `for_key_price()`, `for_stock_pct()` |
+| `EngineConfig` | swing, confirm, ticker, percentage | Thresholds (absolute or percentage). Methods: `swing_at(price)`, `confirm_at(price)`. Factories: `for_stock()`, `for_key_price()`, `for_stock_pct()` |
 | `EngineState` | current, last, last_pivot, nr_peak, nreac_trough, entries, pivots, signals, emitted_keys | Complete immutable FSM state |
 
 ### Group Types
@@ -538,7 +538,7 @@ All types are `frozen=True, slots=True`. No mutation anywhere.
 
 ### Key Design Choices
 
-- `EngineConfig.for_stock_pct(ticker, price, swing_pct)` converts percentage thresholds to absolute points from the stock's starting price
+- `EngineConfig.for_stock_pct(ticker, swing_pct, confirm_pct)` stores percentage thresholds directly (`percentage=True`). `swing_at(price)` and `confirm_at(price)` compute the absolute threshold dynamically from the reference price at each comparison — swing uses the column's last price, confirm uses the pivot price
 - `EngineState.last` and `EngineState.last_pivot` use `dict` for construction, conceptually immutable — new dicts created via `{**old, key: val}` on each transition
 - Append-only collections use tuples: `(*old, new)` to extend
 - Signal dedup uses `frozenset[tuple[str, str | None]]` — `(rule, pivot_key)` pairs
@@ -596,8 +596,8 @@ Livermore tracked groups — two leader stocks per industry. Each group produces
 
 | Engine | Input | Thresholds | Purpose |
 |--------|-------|-----------|---------|
-| Leader A | Stock A daily price | `swing_pct` of starting price | Individual stock trend |
-| Leader B | Stock B daily price | `swing_pct` of starting price | Individual stock trend |
+| Leader A | Stock A daily price | `swing_pct` / `confirm_pct` — dynamic, proportional to reference price | Individual stock trend |
+| Leader B | Stock B daily price | `swing_pct` / `confirm_pct` — dynamic, proportional to reference price | Individual stock trend |
 | **Key Price** | **A price + B price** | **swing=12, confirm=6** (Rule 7) | **Group trend confirmation** |
 
 The **group trend** is determined solely by the Key Price engine's current column:

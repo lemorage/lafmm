@@ -512,7 +512,7 @@ class GroupScreen(Screen):
                     str(sig_count),
                     style=f"bold {POSITIVE}" if sig_count == 0 else f"bold {NEUTRAL}",
                 ),
-                f"{stock.config.swing:.1f}",
+                f"{stock.config.swing}{'%' if stock.config.percentage else ''}",
                 key=str(i),
             )
 
@@ -559,7 +559,8 @@ class StockScreen(Screen):
         super().__init__()
 
     def _header_text(self) -> str:
-        return f"{self.stock.ticker}  —  swing {self.stock.config.swing:.1f}"
+        pct = "%" if self.stock.config.percentage else ""
+        return f"{self.stock.ticker}  —  swing {self.stock.config.swing}{pct}"
 
     def compose(self) -> ComposeResult:
         yield Header()
