@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.2
+
+- fix: compute swing/confirm dynamically from reference price to prevent whipsaw on appreciating stocks
+- fix: correct cache path in parse_ibkr so signal auto-fill works during trade import
+- fix: support fractional share quantities from IBKR
+- fix: resolve invisible tables in TUI price map and stock screens
+- new: analytical toolkit table in agent prompt — maps every analytical need to a concrete tool
+- new: tighten daily-update step 4 with defined data pass and presentation order
+- new: centralize theme and redesign TUI dashboard
+- new: zoom-based history filtering for TUI screens
+- docs: update lafmm_rules.md and agent prompt for percentage-based engine thresholds
+
 ## 0.6.1
 
 - fix: use named column access in fetch_bars to prevent open/close swap

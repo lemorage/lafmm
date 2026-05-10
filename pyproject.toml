@@ -1,6 +1,6 @@
 [project]
 name = "lafmm"
-version = "0.6.1"
+version = "0.6.2"
 description = "Livermore's Anticipating Future Movements Map"
 readme = "README.md"
 authors = [
