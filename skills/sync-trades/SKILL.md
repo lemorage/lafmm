@@ -111,7 +111,9 @@ user: "Run daily-update first to enable signal tracking."
 
 The engine and stats need price history for every traded symbol.
 After every import, check if any traded ticker is not in any tracked
-group (`data/{group}/{TICKER}/`). For each untracked ticker:
+group (`data/{group}/{TICKER}/`). If multiple untracked tickers are
+found, look them all up in parallel using subagents, then decide
+placement, then fetch prices in parallel. For each untracked ticker:
 
 1. Look it up:
    ```bash

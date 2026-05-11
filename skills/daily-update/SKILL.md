@@ -35,9 +35,32 @@ list. Fetch closing prices for each ticker using the fetch script.
 See `references/fetch-prices.md` for the command and options.
 
 Run all tickers, leaders and tracked stocks across all groups.
-Parallelize by group: one subagent per group, each fetching its
-tickers. The script is idempotent, so fetching a ticker that's
-already current is a no-op.
+The script is idempotent — fetching a ticker that's already current
+is a no-op.
+
+Parallelize: read each `group.toml` to get its tickers, then launch
+one subagent per group, all in background. Each subagent runs the
+fetch script for all tickers in its group. Do not loop sequentially
+through 90+ tickers in a single bash command.
+
+While prices fetch in background, start gathering data for step 4
+that does not depend on cache: run `lafmm stats --json`, read
+`tape.md`, read `insights/`, fetch quotes for open positions. When
+all fetch subagents complete, verify prices, then run step 3.
+
+**Verify prices** — after all fetches complete, run these checks
+in parallel using subagents:
+
+- **Staleness**: scan every ticker dir in `data/`. The latest
+  CSV row's date must match the most recent trading day. Retry
+  the fetch for any that are stale or missing.
+- **Cross-reference**: pick tickers across different groups
+  (at least one leader per macro sector). Run the quote skill
+  for each. Compare the quote's close against the CSV's close
+  for the same date. Any mismatch means the data may be
+  corrupted — report to the user before proceeding.
+
+Only proceed to step 3 after verification passes.
 
 ### 3. Sync cache
 
@@ -56,11 +79,11 @@ Ground the summary in data before interpreting.
 - Each `cache/{group}/group.md` for signals and column transitions
   (compare signal dates to the most recent trading day in the data)
 - `lafmm stats --json` for current metrics, open positions, genome
+- `accounts/*/capital/*.csv` latest row for actual account value
 - Quote skill for current prices on any open position tickers
 - Journal entries from step 1, with their signal column
   (auto-filled by the parse script)
-- `tape.md` if pending entries exist, attach to matching journal
-  dates and clear them before proceeding
+- `tape.md` for the user's observations on today's trades
 - `insights/{YEAR}.md` for last session's observations as
   comparison baseline
 - For any significant move (5%+ daily, Key Price reversal, DANGER
@@ -73,7 +96,7 @@ Ground the summary in data before interpreting.
 2. Transitions. Name them explicitly ("UT → NR", not "now in NR")
 3. Market trend, if the bullish/bearish group count shifted
 4. Trade alignment. Today's trades with their signal column from
-   the journal. System-aligned or discretionary. No judgment.
+   the journal. System-aligned or discretionary.
 5. Open positions. Entry from journal, current from quote,
    unrealized computed in Python. System state from cache.
 6. Performance delta. Key metrics from `lafmm stats --json` vs
@@ -84,8 +107,7 @@ Ground the summary in data before interpreting.
 **Interpret.** After all data is presented, 2-4 sentences
 connecting it. Anchor every claim to something from the data pass.
 Cross-sector patterns, concentration observations, approaching
-pivots. No risk lectures. No imperative mood. The user reads and
-decides.
+pivots.
 
 ### 5. Record observations (optional)
 
@@ -125,4 +147,5 @@ evening.
 - Does not make trading decisions. It presents what happened.
 - Does not modify `group.toml`. Threshold tuning is a separate action.
 - Does not add or remove groups. That's build-watchlist.
-- Does not run stats. The user asks for performance analysis separately.
+- Does not produce standalone performance analysis. That's the
+  stats skill.
