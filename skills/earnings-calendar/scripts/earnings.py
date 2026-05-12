@@ -21,6 +21,7 @@ from lafmm.colors import ROTATION_RICH
 DEFAULT_HORIZON_DAYS = 14
 _CACHE_FILENAME = "_earnings.json"
 _META_DIR = "_meta"
+_MAX_FETCH_WORKERS = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,24 +103,38 @@ def _save_earnings_cache(data_dir: Path, cache: dict[str, str]) -> None:
     cache_path.write_text(json.dumps(cache, indent=2, sort_keys=True) + "\n")
 
 
-def _resolve_earnings_date(
-    ticker: str,
+def _is_stale(ticker: str, cache: dict[str, str], today: date) -> bool:
+    cached = cache.get(ticker)
+    if cached is None:
+        return True
+    try:
+        return date.fromisoformat(cached) < today
+    except ValueError:
+        return True
+
+
+def _refresh_stale(
+    tickers: Sequence[tuple[str, str]],
     cache: dict[str, str],
     today: date,
-) -> str | None:
-    cached = cache.get(ticker)
-    if cached is not None:
-        try:
-            if date.fromisoformat(cached) >= today:
-                return cached
-        except ValueError:
-            pass
-    fetched = _fetch_earnings_date(ticker)
-    if fetched is not None:
-        cache[ticker] = fetched
-    elif ticker in cache:
-        del cache[ticker]
-    return fetched
+) -> None:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    stale = [t for t, _group in tickers if _is_stale(t, cache, today)]
+    if not stale:
+        return
+    with ThreadPoolExecutor(max_workers=_MAX_FETCH_WORKERS) as pool:
+        futures = {pool.submit(_fetch_earnings_date, t): t for t in stale}
+        for future in as_completed(futures):
+            ticker = futures[future]
+            try:
+                result = future.result()
+            except Exception:
+                continue
+            if result is not None:
+                cache[ticker] = result
+            elif ticker in cache:
+                del cache[ticker]
 
 
 def _scan_earnings(
@@ -131,17 +146,17 @@ def _scan_earnings(
     horizon_end = today + timedelta(days=horizon_days)
     tickers = _collect_tickers(data_dir, group_filter)
     cache = _load_earnings_cache(data_dir)
-    events: list[EarningsEvent] = []
-    for ticker, group in tickers:
-        date_str = _resolve_earnings_date(ticker, cache, today)
-        if date_str is None:
-            continue
-        event = _build_event(ticker, group, date_str, today, horizon_end)
-        if event is not None:
-            events.append(event)
+    _refresh_stale(tickers, cache, today)
     _save_earnings_cache(data_dir, cache)
-    events.sort(key=lambda e: (e.earnings_date, e.ticker))
-    return events
+    return sorted(
+        [
+            event
+            for ticker, group in tickers
+            if (cached := cache.get(ticker)) is not None
+            and (event := _build_event(ticker, group, cached, today, horizon_end)) is not None
+        ],
+        key=lambda e: (e.earnings_date, e.ticker),
+    )
 
 
 def _print_report(events: Sequence[EarningsEvent], horizon_days: int) -> None:
