@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import contextlib
 import csv
+import random
 import sys
+import time
 from collections import defaultdict
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -15,6 +18,53 @@ from lafmm.quant.types import Bar
 HEADER = ("date", "open", "high", "low", "close", "volume")
 TRADING_TO_CALENDAR = 1.5
 MIN_BARS = 250
+
+THROTTLE_BASE: float = 0.8
+THROTTLE_JITTER: float = 0.4
+_MAX_CONSECUTIVE_FAILURES: int = 2
+
+
+# ── Rate Limiting ──────────────────────────────────────────────────
+
+
+def throttle() -> None:
+    time.sleep(THROTTLE_BASE + random.uniform(-THROTTLE_JITTER, THROTTLE_JITTER))
+
+
+@dataclass(frozen=True, slots=True)
+class _BackfillTarget:
+    symbol: str
+    ticker_dir: Path
+    label: str
+    existing: frozenset[str]
+
+
+def _throttled_backfill(
+    items: Sequence[_BackfillTarget],
+    start: date,
+    end: date,
+) -> list[tuple[str, int]]:
+    updated: list[tuple[str, int]] = []
+    consecutive_empty_fetches = 0
+    for i, item in enumerate(items):
+        if i > 0:
+            throttle()
+        bars = fetch_bars(item.symbol, start, end)
+        if not bars:
+            consecutive_empty_fetches += 1
+            print(f"fetch {item.label}: no data", file=sys.stderr)
+            if consecutive_empty_fetches >= _MAX_CONSECUTIVE_FAILURES:
+                print("rate limited — aborting", file=sys.stderr)
+                break
+            continue
+        consecutive_empty_fetches = 0
+        new_bars = [bar for bar in bars if bar.date not in item.existing]
+        if not new_bars:
+            continue
+        added = write_bars(item.ticker_dir, new_bars)
+        if added > 0:
+            updated.append((item.label, len(item.existing) + added))
+    return updated
 
 
 # ── Fetch ──────────────────────────────────────────────────────────
@@ -166,26 +216,15 @@ def ensure_regime_data(
 ) -> list[tuple[str, int]]:
     ref = _ref_dir(data_dir)
     end = date.today() + timedelta(days=1)
-    calendar_days = int(min_bars * TRADING_TO_CALENDAR)
-    start = end - timedelta(days=calendar_days)
+    start = end - timedelta(days=int(min_bars * TRADING_TO_CALENDAR))
 
-    updated: list[tuple[str, int]] = []
+    items: list[_BackfillTarget] = []
     for yahoo_ticker, local_name in REGIME_TICKERS.items():
         ticker_dir = ref / local_name
         existing = read_existing_dates(ticker_dir)
-        if len(existing) >= min_bars:
-            continue
-        bars = fetch_bars(yahoo_ticker, start, end)
-        if not bars:
-            print(f"fetch {local_name}: no data", file=sys.stderr)
-            continue
-        new_bars = [bar for bar in bars if bar.date not in existing]
-        if not new_bars:
-            continue
-        added = write_bars(ticker_dir, new_bars)
-        if added > 0:
-            updated.append((local_name, len(existing) + added))
-    return updated
+        if len(existing) < min_bars:
+            items.append(_BackfillTarget(yahoo_ticker, ticker_dir, local_name, frozenset(existing)))
+    return _throttled_backfill(items, start, end)
 
 
 def ensure_history(
@@ -198,30 +237,12 @@ def ensure_history(
         return []
 
     end = date.today() + timedelta(days=1)
-    calendar_days = int(min_bars * TRADING_TO_CALENDAR)
-    start = end - timedelta(days=calendar_days)
+    start = end - timedelta(days=int(min_bars * TRADING_TO_CALENDAR))
 
-    updated: list[tuple[str, int]] = []
+    items: list[_BackfillTarget] = []
     for symbol in sorted(traded):
-        ticker_dir = find_ticker_dir(data_dir, symbol)
-        if ticker_dir is None:
-            ticker_dir = data_dir / "_adhoc" / symbol
-
+        ticker_dir = find_ticker_dir(data_dir, symbol) or data_dir / "_adhoc" / symbol
         existing = read_existing_dates(ticker_dir)
-        if len(existing) >= min_bars:
-            continue
-
-        bars = fetch_bars(symbol, start, end)
-        if not bars:
-            print(f"fetch {symbol}: no data", file=sys.stderr)
-            continue
-
-        new_bars = [bar for bar in bars if bar.date not in existing]
-        if not new_bars:
-            continue
-
-        added = write_bars(ticker_dir, new_bars)
-        if added > 0:
-            updated.append((symbol, len(existing) + added))
-
-    return updated
+        if len(existing) < min_bars:
+            items.append(_BackfillTarget(symbol, ticker_dir, symbol, frozenset(existing)))
+    return _throttled_backfill(items, start, end)

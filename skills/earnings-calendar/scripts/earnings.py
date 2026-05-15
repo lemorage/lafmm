@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import calendar
 import json
+import random
 import sys
+import time
 import tomllib
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
@@ -21,7 +23,9 @@ from lafmm.colors import ROTATION_RICH
 DEFAULT_HORIZON_DAYS = 14
 _CACHE_FILENAME = "_earnings.json"
 _META_DIR = "_meta"
-_MAX_FETCH_WORKERS = 8
+_MAX_FETCH_WORKERS = 3
+_THROTTLE_BASE: float = 0.5
+_THROTTLE_JITTER: float = 0.3
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +39,7 @@ class EarningsEvent:
 def _fetch_earnings_date(ticker: str) -> str | None:
     import yfinance as yf
 
+    time.sleep(_THROTTLE_BASE + random.uniform(-_THROTTLE_JITTER, _THROTTLE_JITTER))
     try:
         earnings_calendar = yf.Ticker(ticker).calendar
     except Exception:

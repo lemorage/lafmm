@@ -8,6 +8,7 @@ import json
 import sys
 from pathlib import Path
 
+from lafmm.fetch import throttle
 from lafmm.init import HUMAN_DATA, get_root
 from lafmm.meta import ensure_ticker_meta
 
@@ -36,7 +37,9 @@ def main() -> None:
     data_dir = _resolve_data_dir(args.data_dir)
 
     results = []
-    for symbol in args.symbols:
+    for i, symbol in enumerate(args.symbols):
+        if i > 0:
+            throttle()
         meta = ensure_ticker_meta(data_dir, symbol.upper())
         if meta is None:
             print(f"{symbol.upper()}: no data from yfinance", file=sys.stderr)
