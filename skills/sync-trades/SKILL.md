@@ -85,6 +85,7 @@ Interest: +USD 4.23
 
 - **Capital**: total account value (cash + positions) from NAV in Base
 - **Cash flows**: deposits, withdrawals, dividends, tax, interest, fees in original currency
+- **price/fees/pnl**: always base currency (USD). Non-USD trades are converted using `FXRateToBase` from the Flex Query at import time.
 - **signal**: filled automatically from `cache/` during import.
   For dates after `tracked_since`, the script finds the most recent
   signal that matches the trade direction (BUY for buys, SELL for sells).

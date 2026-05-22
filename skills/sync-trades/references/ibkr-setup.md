@@ -32,7 +32,7 @@ Leave unchecked: Symbol Summary, Asset Class, Order, Closed Lots, Wash Sales.
 
 ### Fields
 
-Select these 13 fields:
+Select these 14 fields:
 
 - Trade Date
 - Date/Time
@@ -47,6 +47,11 @@ Select these 13 fields:
 - Asset Class
 - Currency
 - Net Cash
+- FXRateToBase
+
+`FXRateToBase` converts non-USD trade values to account base currency.
+The parse script multiplies price, fees, and P&L by this rate. For USD
+trades the rate is 1. Required only for non-US equities.
 
 ## Cash Transactions configuration
 
@@ -161,18 +166,19 @@ data. Dedup skips existing entries. No date management needed.
 
 ## Field mapping
 
-| IBKR field | Journal column |
-|-----------|---------------|
-| Trade Date | date (file name) |
-| Date/Time | time |
-| Symbol | symbol |
-| Buy/Sell | side |
-| Quantity | qty |
-| TradePrice | price |
-| IB Commission | fees |
-| Order Type | order |
-| Realized P/L | pnl |
-| Open/Close Indicator | open_close |
+| IBKR field | Journal column | Notes |
+|-----------|---------------|-------|
+| Trade Date | date (file name) | |
+| Date/Time | time | |
+| Symbol | symbol | |
+| Buy/Sell | side | |
+| Quantity | qty | |
+| TradePrice | price | × FXRateToBase for non-USD |
+| IB Commission | fees | × FXRateToBase for non-USD |
+| Order Type | order | |
+| Realized P/L | pnl | × FXRateToBase for non-USD |
+| Open/Close Indicator | open_close | |
+| FXRateToBase | (conversion factor) | 1.0 for USD trades |
 
 Cash Transactions become `Deposit:`, `Withdrawal:`, `Dividend:`,
 `Tax:`, `Interest:`, `Fee:` lines. NAV in Base becomes `Capital:`.
@@ -201,3 +207,7 @@ update once daily after market close. Fetch once per day.
 - **Capital**: from NAV in Base `Total` field. Cash + all positions.
 - **Cash flow currency**: uses `CurrencyPrimary` from the export.
   May differ from base currency (e.g., HKD deposit into USD account).
+- **Non-USD trades**: `FXRateToBase` converts price, fees, and P&L to
+  base currency at import time. For USD trades the rate is 1.0 (no-op).
+  The FX conversion commission (e.g., 2 SEK for a USD→SEK settlement)
+  is not captured in the trade fee — it's absorbed into NAV.

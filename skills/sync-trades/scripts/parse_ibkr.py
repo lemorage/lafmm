@@ -156,10 +156,10 @@ which may differ for international transfers.
 - **symbol**: ticker, uppercase
 - **side**: `buy` or `sell`
 - **qty**: shares, or `2c` for contracts
-- **price**: fill price
-- **fees**: commission + fees
+- **price**: fill price in base currency (non-USD converted via FXRateToBase)
+- **fees**: commission in base currency (non-USD converted via FXRateToBase)
 - **order**: `market`, `limit`, `stop`, or `—`
-- **pnl**: realized P&L from broker. `—` on opens.
+- **pnl**: realized P&L in base currency. `—` on opens.
 - **open_close**: `O` (opening), `C` (closing), or `—`
 - **signal**: most recent matching Livermore signal before trade date
   (BUY for buys, SELL for sells), or `—` if none or contradicting
@@ -232,16 +232,19 @@ def _parse_time(dt: str) -> str:
 def normalize_trade(raw: dict[str, str]) -> Trade | None:
     if raw.get("AssetClass") == "CASH":
         return None
+    fx = float(raw.get("FXRateToBase", "1") or "1")
+    if fx <= 0:
+        return None
     pnl_str = raw.get("FifoPnlRealized", "").strip()
-    pnl_raw = float(pnl_str) if pnl_str else 0.0
+    pnl_raw = float(pnl_str) * fx if pnl_str else 0.0
     return Trade(
         date=raw["TradeDate"],
         time=_parse_time(raw["DateTime"]),
         symbol=raw["Symbol"],
         side="buy" if raw["Buy/Sell"] == "BUY" else "sell",
         qty=abs(float(raw["Quantity"])),
-        price=float(raw["TradePrice"]),
-        fees=abs(float(raw["IBCommission"])),
+        price=float(raw["TradePrice"]) * fx,
+        fees=abs(float(raw["IBCommission"])) * fx,
         order=ORDER_MAP.get(raw["OrderType"], raw["OrderType"].lower() or "—"),
         pnl=f"{pnl_raw:+.2f}" if pnl_raw != 0 else "—",
         open_close=raw["Open/CloseIndicator"].strip() or "—",
