@@ -32,7 +32,7 @@ Leave unchecked: Symbol Summary, Asset Class, Order, Closed Lots, Wash Sales.
 
 ### Fields
 
-Select these 14 fields:
+Select these 15 fields:
 
 - Trade Date
 - Date/Time
@@ -46,10 +46,14 @@ Select these 14 fields:
 - Open/Close Indicator
 - Asset Class
 - Currency
+- Listing Exchange
 - Net Cash
 - FXRateToBase
 
 `FXRateToBase` converts non-USD trade values to account base currency.
+`Listing Exchange` resolves international tickers to their correct
+market (needed for European stocks where the same currency covers
+multiple exchanges).
 The parse script multiplies price, fees, and P&L by this rate. For USD
 trades the rate is 1. Required only for non-US equities.
 

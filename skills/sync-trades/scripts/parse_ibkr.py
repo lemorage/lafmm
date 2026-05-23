@@ -31,6 +31,37 @@ from pathlib import Path
 
 ORDER_MAP: Mapping[str, str] = {"LMT": "limit", "MKT": "market", "STP": "stop"}
 
+_CURRENCY_SUFFIX: Mapping[str, str] = {
+    "SEK": ".ST",
+    "NOK": ".OL",
+    "DKK": ".CO",
+    "GBP": ".L",
+    "GBp": ".L",
+    "CAD": ".TO",
+    "AUD": ".AX",
+    "JPY": ".T",
+    "HKD": ".HK",
+    "CHF": ".SW",
+    "NZD": ".NZ",
+    "SGD": ".SI",
+}
+
+_EXCHANGE_SUFFIX: Mapping[str, str] = {
+    "SFB": ".ST",
+    "IBIS": ".DE",
+    "FWB": ".DE",
+    "SBF": ".PA",
+    "AEB": ".AS",
+    "BVME": ".MI",
+    "BM": ".MC",
+    "LSE": ".L",
+    "TSE": ".TO",
+    "ASX": ".AX",
+    "TSEJ": ".T",
+    "SEHK": ".HK",
+    "HEX": ".HE",
+}
+
 _SIGNAL_RE = re.compile(
     r"^\s*-\s+\*\*(BUY|SELL|DANGER: Up Over|DANGER: Dn Over|WATCH)\*\*"
     r"\s+\$[\d.]+\s+Rule\s+((?:9|10)\([a-f]\))"
@@ -229,6 +260,19 @@ def _parse_time(dt: str) -> str:
     return f"{tp[:2]}:{tp[2:4]}" if len(tp) >= 4 else "--:--"
 
 
+def _resolve_symbol(raw: dict[str, str]) -> str:
+    symbol = raw["Symbol"]
+    currency = raw.get("CurrencyPrimary", "USD")
+    exchange = raw.get("ListingExchange", "")
+    if currency == "USD":
+        return symbol
+    if exchange:
+        suffix = _EXCHANGE_SUFFIX.get(exchange, "")
+        if suffix:
+            return symbol + suffix
+    return symbol + _CURRENCY_SUFFIX.get(currency, "")
+
+
 def normalize_trade(raw: dict[str, str]) -> Trade | None:
     if raw.get("AssetClass") == "CASH":
         return None
@@ -240,7 +284,7 @@ def normalize_trade(raw: dict[str, str]) -> Trade | None:
     return Trade(
         date=raw["TradeDate"],
         time=_parse_time(raw["DateTime"]),
-        symbol=raw["Symbol"],
+        symbol=_resolve_symbol(raw),
         side="buy" if raw["Buy/Sell"] == "BUY" else "sell",
         qty=abs(float(raw["Quantity"])),
         price=float(raw["TradePrice"]) * fx,
@@ -466,6 +510,7 @@ def main() -> None:
     raw_trades, raw_cash, nav = parse_csv(csv_text)
     trades = normalize_trades(raw_trades)
     cash = normalize_cash(raw_cash)
+
     stats = write_journal(journal_dir, trades, cash, nav, signals, tracked_since)
     capital_rows = write_capital(capital_dir, nav)
 
