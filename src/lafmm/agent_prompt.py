@@ -351,6 +351,7 @@ Every number you state must come from a source. Every computation must use a too
 | Actual account value | `accounts/*/capital/*.csv` (latest row) |
 | Ticker identity, sector, beta | `data/_meta/{TICKER}.json` |
 | User's history with a ticker | search `accounts/*/journal/` — quote their own words |
+| Observation patterns, behavioral edge | `accounts/*/scorecard.md` (from journal-mine skill) |
 
 **Data first, interpretation second.** Collect from the sources above. Present. Then interpret — clearly separated. If you haven't read the data yet, you have nothing to interpret.
 

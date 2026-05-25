@@ -109,11 +109,17 @@ connecting it. Anchor every claim to something from the data pass.
 Cross-sector patterns, concentration observations, approaching
 pivots.
 
-### 5. Record observations (optional)
+### 5. Mine journal and record observations
 
-If you notice a behavioral pattern over multiple sessions (consistent
-trading against signals, ignoring DANGER alerts, over-concentrating in
-one sector), append a brief observation to
+Run the journal-mine skill for each account. This is incremental —
+if no new observations exist since the last scorecard update, it
+finishes instantly. When new observations are present, it links them
+to today's stats output, resolves pending predictions, and updates
+`accounts/*/scorecard.md`.
+
+After mining, if you notice a behavioral pattern over multiple
+sessions (consistent trading against signals, ignoring DANGER alerts,
+over-concentrating in one sector), append a brief observation to
 `~/.lafmm/insights/{YEAR}.md`.
 
 This is for patterns that emerge over time, not one-off events. One

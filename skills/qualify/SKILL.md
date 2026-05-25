@@ -61,6 +61,11 @@ exist. All paths are relative to `~/.lafmm/`.
 6. **`data/_meta/{TICKER}.json`** — if it exists, read sector, market
    cap, beta. Provides fundamental context without requiring the user
    to say anything.
+7. **`accounts/*/scorecard.md`** — if it exists, check for
+   ticker-specific edge ("user reads SNXX exceptionally well"),
+   behavioral warnings ("user tends to FOMO into this setup type"),
+   and hypothesis track record. Weight the user's conviction higher
+   when their observation accuracy for this ticker/setup is strong.
 
 ### Check market context
 
