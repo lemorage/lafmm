@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.3
+
+- new skill: journal-mine for observation-outcome feedback loop (scorecard, behavioral correlations, hypothesis tracking)
+- new: qualify reads scorecard for ticker-specific edge and behavioral warnings
+- new: daily-update auto-runs journal-mine as step 5
+- feat: resolve international tickers to yfinance symbols at import
+- feat: support multi-currency trade import (FXRateToBase conversion)
+- feat: parallelize earnings date fetching with thread pool
+- feat: parallel price fetch with verification gate
+- fix: throttle yfinance fetches to prevent rate limiting
+
 ## 0.6.2
 
 - fix: compute swing/confirm dynamically from reference price to prevent whipsaw on appreciating stocks
