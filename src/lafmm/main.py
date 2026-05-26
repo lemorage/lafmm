@@ -68,6 +68,10 @@ def stats(account: str | None, period: str | None, benchmark: bool, as_json: boo
         from lafmm.fetch import MIN_BARS, ensure_history, ensure_regime_data
 
         regime_updated = ensure_regime_data(data_dir)
+        if regime_updated:
+            from lafmm.fetch import throttle
+
+            throttle()
         trade_updated = ensure_history(account_dir, data_dir)
         all_updated = regime_updated + trade_updated
         if all_updated:

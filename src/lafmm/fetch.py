@@ -217,12 +217,14 @@ def ensure_regime_data(
     ref = _ref_dir(data_dir)
     end = date.today() + timedelta(days=1)
     start = end - timedelta(days=int(min_bars * TRADING_TO_CALENDAR))
+    stale_threshold = (date.today() - timedelta(days=5)).isoformat()
 
     items: list[_BackfillTarget] = []
     for yahoo_ticker, local_name in REGIME_TICKERS.items():
         ticker_dir = ref / local_name
         existing = read_existing_dates(ticker_dir)
-        if len(existing) < min_bars:
+        stale = bool(existing) and max(existing) < stale_threshold
+        if len(existing) < min_bars or stale:
             items.append(_BackfillTarget(yahoo_ticker, ticker_dir, local_name, frozenset(existing)))
     return _throttled_backfill(items, start, end)
 
