@@ -30,6 +30,8 @@ from pathlib import Path
 
 from lafmm.classify import Side
 
+PF_NO_LOSSES: float = -1.0
+
 # ── Types ────────────────────────────────────────────────────────────
 
 
@@ -681,13 +683,14 @@ def _rolling(
         losses = [p for p in batch if p.pnl < 0]
         gross_win = sum(p.pnl for p in wins)
         gross_loss = abs(sum(p.pnl for p in losses))
+        profit_factor = round(gross_win / gross_loss, 2) if gross_loss > 0 else PF_NO_LOSSES
         points.append(
             RollingPoint(
                 window=window,
                 trip_number=i,
                 win_rate=round(len(wins) / window * 100, 1),
                 expectancy=round((gross_win - gross_loss) / window, 2),
-                profit_factor=round(gross_win / gross_loss, 2) if gross_loss > 0 else 0.0,
+                profit_factor=profit_factor,
             )
         )
     return tuple(points)

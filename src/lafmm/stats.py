@@ -224,17 +224,28 @@ def _costs_pairs(data: dict) -> list[tuple[str, str]]:
 # ── Rolling metrics ─────────────────────────────────────────────────
 
 
+SPARKLINE_HEADROOM = 1.1
+
+
+def _cap_profit_factors(all_pf: list[float]) -> tuple[list[float], float]:
+    valid = [v for v in all_pf if v >= 0]
+    cap = max(valid) * SPARKLINE_HEADROOM if valid else 1.0
+    return [cap if v < 0 else v for v in all_pf], cap
+
+
 def _rolling_rows(data: dict) -> list[tuple[str, str, str, str]]:
     rolling = data["rolling"]
     win_rates = [p["win_rate"] for p in rolling]
     expectancies = [p["expectancy"] for p in rolling]
-    profit_factors = [p["profit_factor"] for p in rolling]
+    all_profit_factors = [p["profit_factor"] for p in rolling]
+    profit_factors, pf_cap = _cap_profit_factors(all_profit_factors)
 
     avg_win_rate = data.get("win_rate", 0.0)
     avg_expectancy = data.get("expectancy", 0.0)
     avg_profit_factor = data.get("profit_factor", 0.0)
+    last_profit_factor = all_profit_factors[-1] if all_profit_factors else 0.0
     expectancy_color = TERM_POSITIVE if expectancies[-1] >= 0 else TERM_NEGATIVE
-    profit_factor_color = _pf_color(profit_factors[-1])
+    profit_factor_color = _pf_color(pf_cap if last_profit_factor < 0 else last_profit_factor)
 
     return [
         (
@@ -252,14 +263,18 @@ def _rolling_rows(data: dict) -> list[tuple[str, str, str, str]]:
         (
             "Profit Factor",
             sparkline(profit_factors, "magenta"),
-            f"[{profit_factor_color}]{profit_factors[-1]:.2f}[/]",
+            _pf_display(last_profit_factor, profit_factor_color),
             f"avg {avg_profit_factor:.2f}",
         ),
     ]
 
 
 def _render_rolling(data: dict, con: Console) -> None:
-    window = data["rolling"][0]["window"]
+    rolling = data["rolling"]
+    window = rolling[0]["window"]
+    last_win_rate = rolling[-1]["win_rate"]
+    perfect = last_win_rate >= 100.0
+
     t = Table(box=None, show_header=False, expand=True, padding=(0, 1))
     t.add_column(style="bold", no_wrap=True)
     t.add_column(ratio=1)
@@ -267,14 +282,19 @@ def _render_rolling(data: dict, con: Console) -> None:
     t.add_column(justify="right", no_wrap=True, style="dim")
     for row in _rolling_rows(data):
         t.add_row(*row)
-    con.print(
-        Panel(
-            t,
-            title=f"[bold]Rolling {window}-Trip Metrics[/]",
-            border_style="blue",
-            padding=(1, 2),
+
+    if perfect:
+        title = (
+            f"[bold blink rgb(255,220,100)]\u2727[/] "
+            f"[bold rgb(255,200,60)]Rolling {window}-Trip Metrics[/] "
+            f"[bold blink rgb(255,220,100)]\u2727[/]"
         )
-    )
+        border = "rgb(255,180,40)"
+    else:
+        title = f"[bold]Rolling {window}-Trip Metrics[/]"
+        border = "blue"
+
+    con.print(Panel(t, title=title, border_style=border, padding=(1, 2)))
 
 
 # ── Monthly P&L chart ───────────────────────────────────────────────
@@ -659,6 +679,12 @@ def _render_genome(data: dict, con: Console) -> None:
 
 def _pf_color(profit_factor: float) -> str:
     return color_by_threshold(profit_factor, good=1.5, neutral=1.0)
+
+
+def _pf_display(pf: float, color: str) -> str:
+    if pf < 0:
+        return "[bold blink rgb(255,220,100)]+\u221e[/]"
+    return f"[{color}]{pf:.2f}[/]"
 
 
 def _pnl(v: float) -> str:
