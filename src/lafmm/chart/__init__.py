@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from lafmm.chart.bars import horizontal_bars, sparkline, vertical_bars
+from lafmm.chart.bars import horizontal_bars, pie_chart, sparkline, vertical_bars
 from lafmm.chart.canvas import Canvas
 from lafmm.chart.composers import (
     adx_chart,
@@ -55,6 +55,7 @@ __all__ = [
     "macd_chart",
     "obv_chart",
     "overlay_chart",
+    "pie_chart",
     "render_chart",
     "rsi_chart",
     "sparkline",

@@ -145,7 +145,9 @@ class Stats:
     largest_loss: float = 0.0
     expectancy: float = 0.0
     profit_factor: float = 0.0
+    total_gross_profit: float = 0.0
     concentration_pct: float = 0.0
+    gross_abs_pnl: float = 0.0
     start_capital: float = 0.0
     end_capital: float = 0.0
     total_deposits: float = 0.0
@@ -500,6 +502,7 @@ def _performance(
         "largest_loss": min((p.pnl for p in losses), default=0.0),
         "expectancy": total_pnl / len(positions) if positions else 0.0,
         "profit_factor": round(gross_win / gross_loss, 2) if gross_loss > 0 else 0.0,
+        "total_gross_profit": round(gross_win, 2),
     }
 
 
@@ -665,6 +668,7 @@ def _exposure(positions: Sequence[Position]) -> dict:
     return {
         "symbols_traded": len(by_symbol),
         "concentration_pct": round(concentration, 1),
+        "gross_abs_pnl": round(gross_abs, 2),
         "top_symbols": tuple(top),
         "monthly_pnl": tuple(MonthPnl(m, round(p, 2)) for m, p in sorted(by_month.items())),
     }

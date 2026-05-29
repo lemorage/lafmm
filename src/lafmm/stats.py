@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import re
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -16,7 +17,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from lafmm.chart import sparkline, vertical_bars
+from lafmm.chart import pie_chart, sparkline, vertical_bars
 from lafmm.colors import (
     ROTATION_RICH,
     TERM_NEGATIVE,
@@ -48,6 +49,8 @@ def render_stats(data: dict, console: Console | None = None) -> None:
         _render_rolling(data, con)
     con.print()
     _monthly(data, con)
+    con.print()
+    _pnl_attribution(data, con)
     con.print()
     _symbols(data, con)
     con.print()
@@ -173,12 +176,24 @@ def _perf_pairs(data: dict) -> list[tuple[str, str]]:
 
 def _risk_pairs(data: dict) -> list[tuple[str, str]]:
     d = data
+    concentration = d.get("concentration_pct", 0.0)
+    top_sym = d.get("top_symbols", [{}])
+    concentration_name = top_sym[0]["symbol"] if top_sym else ""
+    concentration_style = (
+        TERM_NEGATIVE if concentration > 50 else (TERM_NEUTRAL if concentration > 30 else "dim")
+    )
+    concentration_label = (
+        f"[{concentration_style}]{concentration:.0f}% in {concentration_name}[/]"
+        if concentration > 0
+        else "\u2014"
+    )
     return [
         ("Max Drawdown", f"[red]-{d['max_drawdown_pct']:.1f}%[/]"),
         ("Drawdown Days", str(d["max_drawdown_days"])),
         ("Win Streak", f"[green]{d['longest_win_streak']}[/]"),
         ("Loss Streak", f"[red]{d['longest_loss_streak']}[/]"),
         ("Sharpe Ratio", f"{d['sharpe']:.2f}"),
+        ("Concentration", concentration_label),
     ]
 
 
@@ -330,6 +345,49 @@ def _win_rate_color(rate: float) -> str:
     return color_by_threshold(rate, good=WIN_RATE_GOOD, neutral=WIN_RATE_TERM_NEUTRAL)
 
 
+# ── P&L Attribution ────────────────────────────────────────────────
+
+
+def _pnl_attribution(data: dict, con: Console) -> None:
+    symbols = data.get("top_symbols", [])
+    total_gross_profit = data.get("total_gross_profit", 0.0)
+    if not symbols or total_gross_profit <= 0:
+        return
+
+    pie_symbols = [s for s in symbols if s["pnl"] > 0]
+    pie_labels = [s["symbol"] for s in pie_symbols]
+    pie_values = [s["pnl"] for s in pie_symbols]
+    others = total_gross_profit - sum(pie_values)
+    if others > 0:
+        pie_labels.append("Others")
+        pie_values.append(others)
+
+    if not pie_values:
+        return
+
+    pie = pie_chart(pie_labels, pie_values)
+    if not pie:
+        return
+
+    centered = _center_markup(pie, con.width - 8)
+    con.print(
+        Panel(
+            Text.from_markup(centered),
+            title="[bold]P&L Attribution[/]",
+            border_style="blue",
+            padding=(1, 2),
+        )
+    )
+
+
+def _center_markup(markup: str, panel_width: int) -> str:
+    lines = markup.split("\n")
+    visible = [re.sub(r"\[.*?\]", "", ln) for ln in lines]
+    max_w = max(len(v) for v in visible) if visible else 0
+    left_pad = max(0, (panel_width - max_w) // 2)
+    return "\n".join(" " * left_pad + ln for ln in lines)
+
+
 # ── Top symbols ─────────────────────────────────────────────────────
 
 
@@ -360,17 +418,9 @@ def _symbols(data: dict, con: Console) -> None:
             f"[{win_rate_color}]{win_rate:.0f}%[/]" if trip_count else "—",
         )
 
-    conc = data.get("concentration_pct", 0.0)
-    footer = ""
-    if conc > 0 and symbols:
-        style = TERM_NEGATIVE if conc > 50 else (TERM_NEUTRAL if conc > 30 else "dim")
-        footer = f"\n  [{style}]{conc:.0f}% concentration in {symbols[0]['symbol']}[/]"
-
-    content = Group(t, Text.from_markup(footer)) if footer else t
-
     con.print(
         Panel(
-            content,
+            t,
             title=f"[bold]Top Symbols[/]  [dim]({n_traded} traded)[/]",
             border_style="blue",
             padding=(1, 2),

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 
-from lafmm.colors import TERM_NEGATIVE, TERM_POSITIVE
+from lafmm.colors import ROTATION_RICH, TERM_NEGATIVE, TERM_POSITIVE
 
 BLOCKS = " ▁▂▃▄▅▆▇█"
 
@@ -216,3 +217,86 @@ def _pnl_num(v: float) -> str:
     if v >= 0:
         return f"+${v:,.2f}"
     return f"-${abs(v):,.2f}"
+
+
+# ── Pie chart ─────────────────────────────────────────────────────
+
+PIE_FILL = "\u2022"
+PIE_ASPECT = 2
+PIE_LEGEND_GAP = 4
+
+
+def _pie_angles(percents: Sequence[float], radius: int) -> list[float]:
+    min_angle = 360 / (radius * PIE_ASPECT * 2)
+    raw = [pct * 360 for pct in percents]
+    for i, a in enumerate(raw):
+        if 0 < a < min_angle:
+            raw[i] = min_angle
+    total = sum(raw)
+    angles: list[float] = []
+    cumulative = 0.0
+    for a in raw:
+        cumulative += a / total * 360
+        angles.append(cumulative)
+    return angles
+
+
+def _pie_row(
+    y: int,
+    radius: int,
+    angles: Sequence[float],
+    fill: str,
+    colors: Sequence[str],
+) -> str:
+    width = round(math.sqrt(max(0, radius * radius - y * y)) * PIE_ASPECT)
+    if width == 0:
+        width = round(radius / PIE_ASPECT)
+    pad = (radius * PIE_ASPECT - width) * " "
+    chars: list[str] = []
+    for x in range(-width, width + 1):
+        segment_angle = 180 - math.degrees(math.atan2(x / PIE_ASPECT, y))
+        segment_idx = 0
+        for i, a in enumerate(angles):
+            if segment_angle < a:
+                segment_idx = i
+                break
+        chars.append(f"[{colors[segment_idx % len(colors)]}]{fill}[/]")
+    return pad + "".join(chars)
+
+
+def pie_chart(
+    labels: Sequence[str],
+    values: Sequence[float],
+    *,
+    radius: int = 10,
+    fill: str = PIE_FILL,
+    colors: Sequence[str] = ROTATION_RICH,
+) -> str:
+    if not values or sum(values) == 0:
+        return ""
+    total = sum(values)
+    percents = [v / total for v in values]
+    angles = _pie_angles(percents, radius)
+
+    legend_lines: list[str] = []
+    for i, (label, pct) in enumerate(zip(labels, percents, strict=True)):
+        color = colors[i % len(colors)]
+        legend_lines.append(f"[{color}]{fill}[/] {label} {pct * 100:.1f}%")
+
+    chart_h = radius * 2 + 1
+    legend_spacing = 2
+    legend_total_h = (len(legend_lines) - 1) * legend_spacing
+    legend_start = max(0, (chart_h - legend_total_h) // 2)
+
+    output: list[str] = []
+    for row, y in enumerate(range(-radius, radius + 1)):
+        line = _pie_row(y, radius, angles, fill, colors)
+        legend_row = row - legend_start
+        leg = ""
+        if legend_row >= 0 and legend_row % legend_spacing == 0:
+            li = legend_row // legend_spacing
+            if li < len(legend_lines):
+                leg = " " * PIE_LEGEND_GAP + legend_lines[li]
+        output.append(f"  {line}{leg}")
+
+    return "\n".join(output)
