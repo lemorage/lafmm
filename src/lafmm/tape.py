@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import re
+import sys
+import termios
+import tty
 from datetime import date as dt
 from datetime import timedelta
 from pathlib import Path
@@ -36,19 +40,78 @@ def save_thought(root: Path, trade_date: str, text: str) -> int:
     return len([line for line in content.splitlines() if line.strip()])
 
 
+_PREFIX = "  \033[2m│\033[0m  "
+
+
+def _read_loop(fd: int) -> tuple[str, bool]:
+    """Raw-mode input loop. Returns (content, saved)."""
+    lines: list[str] = []
+    current: list[str] = []
+    prev_was_cr = False
+
+    sys.stdout.write(_PREFIX)
+    sys.stdout.flush()
+
+    while True:
+        data = os.read(fd, 4096)
+        if not data:
+            lines.append("".join(current))
+            return "\n".join(lines), True
+        for byte in data.decode("utf-8", errors="replace"):
+            if byte == "\x04":
+                lines.append("".join(current))
+                return "\n".join(lines), True
+            if byte == "\x03":
+                return "", False
+            if byte == "\n" and prev_was_cr:
+                prev_was_cr = False
+                continue
+            prev_was_cr = byte == "\r"
+            if byte in ("\r", "\n"):
+                lines.append("".join(current))
+                current = []
+                sys.stdout.write(f"\r\n{_PREFIX}")
+                sys.stdout.flush()
+            elif byte == "\x7f" or byte == "\x08":
+                if current:
+                    current.pop()
+                    sys.stdout.write("\b \b")
+                    sys.stdout.flush()
+            elif byte >= " " or byte == "\t":
+                current.append(byte)
+                sys.stdout.write(byte)
+                sys.stdout.flush()
+
+    lines.append("".join(current))
+    return "\n".join(lines), True
+
+
+def _raw_input() -> tuple[str, bool]:
+    """Enter raw mode, collect input, restore terminal."""
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        return _read_loop(fd)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
 def read_interactive(con: Console, trade_date: str) -> str:
     con.print()
     con.print(f"  [bold]◆[/] [cyan]{trade_date}[/]  [dim](ctrl+d to save)[/]")
-    con.print("  [dim]│[/]")
-    lines: list[str] = []
-    try:
-        while True:
-            raw = input("  │  ")
-            lines.append(raw)
-    except EOFError:
-        pass
-    con.print("  [dim]└[/]")
-    return "\n".join(lines)
+    con.print(f"  [dim]╭{'─' * 50}[/]")
+    sys.stdout.flush()
+
+    content, saved = _raw_input()
+
+    sys.stdout.write("\r\n")
+    sys.stdout.flush()
+    con.print(f"  [dim]╰{'─' * 50}[/]")
+    if not saved:
+        con.print("  [dim]cancelled[/]")
+        return ""
+    return content
 
 
 def _parse_entries(text: str) -> list[tuple[str, str]]:
