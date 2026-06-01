@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.4
+
+- new: auto-adjust historical prices on stock split during fetch
+- new: P&L attribution pie chart and move concentration to Risk panel
+- fix: use raw terminal mode for tape input to prevent paste garbling
+- fix: display rolling profit factor correctly for all-win windows
+- fix: keep regime data fresh and throttle between backfill passes
+
 ## 0.6.3
 
 - new skill: journal-mine for observation-outcome feedback loop (scorecard, behavioral correlations, hypothesis tracking)
