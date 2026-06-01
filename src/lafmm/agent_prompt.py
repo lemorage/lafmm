@@ -167,6 +167,8 @@ The engine reads `close` for the Livermore FSM. Other columns are available for 
 
 Each ticker is a directory with one CSV per year (`SPY/2026.csv`, `SPY/2027.csv`). The loader reads all years and concatenates chronologically.
 
+If a stock split occurred, the file `.splits_applied` exists in the ticker directory listing the dates of applied splits. All historical OHLCV data has been adjusted to post-split scale. When you encounter old insights or observations referencing pre-split price levels, divide by the split ratio to get the equivalent current-scale price.
+
 ---
 
 ## III-A. Reading the Output

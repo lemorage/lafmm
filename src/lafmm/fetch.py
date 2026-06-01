@@ -24,6 +24,86 @@ THROTTLE_JITTER: float = 0.4
 _MAX_CONSECUTIVE_FAILURES: int = 2
 
 
+# ── Split Adjustment ──────────────────────────────────────────────
+
+_SPLITS_APPLIED = ".splits_applied"
+
+
+def _read_applied_splits(ticker_dir: Path) -> set[str]:
+    marker = ticker_dir / _SPLITS_APPLIED
+    if not marker.exists():
+        return set()
+    return set(marker.read_text().splitlines())
+
+
+def _record_applied_split(ticker_dir: Path, split_date: str) -> None:
+    marker = ticker_dir / _SPLITS_APPLIED
+    applied = _read_applied_splits(ticker_dir)
+    applied.add(split_date)
+    marker.write_text("\n".join(sorted(applied)) + "\n")
+
+
+def _unapplied_splits(
+    symbol: str,
+    since: str,
+    already_applied: set[str],
+) -> list[tuple[str, float]]:
+    import yfinance as yf
+
+    ticker = yf.Ticker(symbol)
+    splits = ticker.splits
+    if splits is None or splits.empty:
+        return []
+    return [
+        (str(splits.index[i])[:10], float(splits.iloc[i]))
+        for i in range(len(splits))
+        if str(splits.index[i])[:10] > since and str(splits.index[i])[:10] not in already_applied
+    ]
+
+
+def _adjust_csv_for_split(csv_path: Path, ratio: float) -> None:
+    rows: list[dict[str, str]] = []
+    with csv_path.open() as f:
+        for row in csv.DictReader(f):
+            rows.append(row)
+    if not rows:
+        return
+    tmp = csv_path.with_suffix(".tmp")
+    with tmp.open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(HEADER)
+        for row in rows:
+            writer.writerow(
+                [
+                    row["date"],
+                    f"{float(row['open']) / ratio:.2f}",
+                    f"{float(row['high']) / ratio:.2f}",
+                    f"{float(row['low']) / ratio:.2f}",
+                    f"{float(row['close']) / ratio:.2f}",
+                    int(float(row["volume"]) * ratio),
+                ]
+            )
+    tmp.replace(csv_path)
+
+
+def _apply_splits(ticker_dir: Path, symbol: str, existing: frozenset[str]) -> None:
+    if not existing:
+        return
+    last_date = max(existing)
+    applied = _read_applied_splits(ticker_dir)
+    splits = _unapplied_splits(symbol, last_date, applied)
+    if not splits:
+        return
+    for split_date, ratio in splits:
+        print(
+            f"split detected: {symbol} {ratio}:1 on {split_date}",
+            file=sys.stderr,
+        )
+        for csv_file in ticker_dir.glob("*.csv"):
+            _adjust_csv_for_split(csv_file, ratio)
+        _record_applied_split(ticker_dir, split_date)
+
+
 # ── Rate Limiting ──────────────────────────────────────────────────
 
 
@@ -58,6 +138,7 @@ def _throttled_backfill(
                 break
             continue
         consecutive_empty_fetches = 0
+        _apply_splits(item.ticker_dir, item.symbol, item.existing)
         new_bars = [bar for bar in bars if bar.date not in item.existing]
         if not new_bars:
             continue
