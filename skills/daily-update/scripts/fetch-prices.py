@@ -2,18 +2,12 @@
 """Fetch daily OHLCV prices and append to LAFMM CSV files.
 
 Usage:
-    ./run .claude/skills/daily-update/scripts/fetch-prices.py TICKER
-        [--csv PATH] [--start DATE] [--days N]
+    ./run .claude/skills/daily-update/scripts/fetch-prices.py
+    ./run .claude/skills/daily-update/scripts/fetch-prices.py TICKER [TICKER ...]
+    ./run .claude/skills/daily-update/scripts/fetch-prices.py --group semis
 
-Examples:
-    ./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA
-    ./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --csv data/semis/NVDA
-    ./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --start 2026-01-02
-    ./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 30
-
-CSVs are partitioned by year: each ticker gets a directory with one CSV per year.
-Format: date,open,high,low,close,volume (OHLCV).
-Output is always appended — existing rows are preserved, duplicates skipped.
+With no arguments, fetches all tracked tickers across all groups.
+With tickers, fetches only those. With --group, fetches that group.
 
 SPDX-License-Identifier: GPL-3.0-only
 """
@@ -21,121 +15,120 @@ SPDX-License-Identifier: GPL-3.0-only
 from __future__ import annotations
 
 import argparse
-import csv
 import sys
-from collections.abc import Sequence
 from datetime import date, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from lafmm.fetch import fetch_bars, find_ticker_dir, read_existing_dates, write_bars
-from lafmm.quant.types import Bar
-
-if TYPE_CHECKING:
-    from _csv import _writer
-
-HEADER = ["date", "open", "high", "low", "close", "volume"]
-
-
-def _write_bar_with_echo(writer: _writer, bar: Bar) -> None:
-    row = [
-        bar.date,
-        f"{bar.open:.2f}",
-        f"{bar.high:.2f}",
-        f"{bar.low:.2f}",
-        f"{bar.close:.2f}",
-        bar.volume,
-    ]
-    writer.writerow(row)
-    print(",".join(str(v) for v in row))
+from lafmm.fetch import (
+    MIN_BARS,
+    TRADING_TO_CALENDAR,
+    _BackfillTarget,
+    _throttled_backfill,
+    find_ticker_dir,
+    read_existing_dates,
+)
 
 
-def append_bars_flat(csv_path: Path, bars: Sequence[Bar]) -> int:
-    is_new = not csv_path.exists() or csv_path.stat().st_size == 0
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
-    with csv_path.open("a", newline="") as f:
-        writer = csv.writer(f)
-        if is_new:
-            writer.writerow(HEADER)
-        for bar in bars:
-            _write_bar_with_echo(writer, bar)
-    return len(bars)
-
-
-def resolve_target(ticker: str, explicit: Path | None) -> Path:
-    if explicit is not None:
-        return explicit
+def _data_dir() -> Path:
     from lafmm.init import HUMAN_DATA, get_root
 
     root = get_root()
-    data_dir = root / HUMAN_DATA if root else Path.home() / ".lafmm" / "data"
-    if data_dir.exists():
-        found = find_ticker_dir(data_dir, ticker)
-        if found is not None:
-            return found
-    return Path.cwd() / ticker
+    return root / HUMAN_DATA if root else Path.home() / ".lafmm" / "data"
 
 
-def resolve_start_date(
-    explicit_start: date | None,
-    days: int | None,
-    existing_dates: set[str],
-) -> date:
-    today = date.today()
-    if explicit_start is not None:
-        return explicit_start
-    if days is not None:
-        return today - timedelta(days=days)
-    if existing_dates:
-        return date.fromisoformat(max(existing_dates)) + timedelta(days=1)
-    return today - timedelta(days=60)
+_SKIP_DIRS = {"_meta", "_ref"}
+_STALE_DAYS = 3
 
 
-def run_fetch(ticker: str, target: Path, start: date) -> None:
-    today = date.today()
-    if start > today:
-        print(f"already up to date (last: {start - timedelta(days=1)})")
-        sys.exit(0)
+def _discover_all(data_dir: Path) -> list[_BackfillTarget]:
+    items: list[_BackfillTarget] = []
+    for group_dir in sorted(data_dir.iterdir()):
+        if not group_dir.is_dir() or group_dir.name.startswith("."):
+            continue
+        if group_dir.name in _SKIP_DIRS:
+            continue
+        items.extend(_discover_group(group_dir))
+    return items
 
-    existing_dates = read_existing_dates(target)
-    bars = fetch_bars(ticker, start, today + timedelta(days=1))
-    new_bars = sorted(
-        [b for b in bars if b.date not in existing_dates],
-        key=lambda b: b.date,
-    )
 
-    if not new_bars:
-        last = max(existing_dates) if existing_dates else "empty"
-        print(f"{ticker}: no new data (has through {last})")
-        sys.exit(0)
+def _discover_group(group_dir: Path) -> list[_BackfillTarget]:
+    items: list[_BackfillTarget] = []
+    for ticker_dir in sorted(group_dir.iterdir()):
+        if not ticker_dir.is_dir() or ticker_dir.name.startswith((".", "_")):
+            continue
+        if not any(ticker_dir.glob("*.csv")):
+            continue
+        existing = read_existing_dates(ticker_dir)
+        label = f"{group_dir.name}/{ticker_dir.name}"
+        items.append(_BackfillTarget(ticker_dir.name, ticker_dir, label, frozenset(existing)))
+    return items
 
-    if target.is_dir() or not target.suffix:
-        added = write_bars(target, new_bars)
-    else:
-        added = append_bars_flat(target, new_bars)
 
-    total = len(existing_dates) + added
-    print(f"\n{ticker}: +{added} rows → {target} (total: {total})")
+def _discover_tickers(data_dir: Path, tickers: list[str]) -> list[_BackfillTarget]:
+    items: list[_BackfillTarget] = []
+    for symbol in tickers:
+        ticker_dir = find_ticker_dir(data_dir, symbol)
+        if ticker_dir is None:
+            print(f"{symbol}: not found in any group", file=sys.stderr)
+            continue
+        existing = read_existing_dates(ticker_dir)
+        items.append(_BackfillTarget(symbol, ticker_dir, symbol, frozenset(existing)))
+    return items
+
+
+def _stale_only(items: list[_BackfillTarget]) -> list[_BackfillTarget]:
+    threshold = (date.today() - timedelta(days=_STALE_DAYS)).isoformat()
+    return [item for item in items if not item.existing or max(item.existing) < threshold]
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Fetch daily OHLCV prices for LAFMM")
-    parser.add_argument("ticker", help="stock ticker symbol (e.g. NVDA)")
-    parser.add_argument("--csv", type=Path, default=None, help="path to ticker dir or CSV file")
-    parser.add_argument(
-        "--start",
-        type=date.fromisoformat,
-        default=None,
-        help="start date (YYYY-MM-DD)",
-    )
-    parser.add_argument("--days", type=int, default=None, help="fetch last N calendar days")
+    parser = argparse.ArgumentParser(description="Fetch daily OHLCV prices")
+    parser.add_argument("tickers", nargs="*", help="ticker symbols (omit for all)")
+    parser.add_argument("--group", default=None, help="fetch a specific group")
+    parser.add_argument("--all", action="store_true", help="fetch even if recent")
+    parser.add_argument("--days", type=int, default=None, help="lookback in calendar days")
     args = parser.parse_args()
 
-    ticker = args.ticker.upper()
-    target = resolve_target(ticker, args.csv)
-    existing = read_existing_dates(target)
-    start = resolve_start_date(args.start, args.days, existing)
-    run_fetch(ticker, target, start)
+    data_dir = _data_dir()
+    if not data_dir.exists():
+        print("no data directory found", file=sys.stderr)
+        sys.exit(1)
+
+    if args.tickers:
+        items = _discover_tickers(data_dir, [t.upper() for t in args.tickers])
+    elif args.group:
+        group_dir = data_dir / args.group
+        if not group_dir.is_dir():
+            print(f"group not found: {args.group}", file=sys.stderr)
+            sys.exit(1)
+        items = _discover_group(group_dir)
+    else:
+        items = _discover_all(data_dir)
+
+    if not args.all:
+        items = _stale_only(items)
+
+    if not items:
+        print("all tickers up to date")
+        sys.exit(0)
+
+    print(f"fetching {len(items)} tickers...")
+    end = date.today() + timedelta(days=1)
+    if args.days:
+        lookback = args.days
+    elif any(not item.existing for item in items):
+        lookback = int(MIN_BARS * TRADING_TO_CALENDAR)
+    else:
+        lookback = 60
+    start = end - timedelta(days=lookback)
+    updated = _throttled_backfill(items, start, end)
+
+    if updated:
+        for label, total in updated:
+            print(f"  {label}: {total} bars")
+        print(f"\nupdated {len(updated)}/{len(items)} tickers")
+    else:
+        print("no new data available")
 
 
 if __name__ == "__main__":

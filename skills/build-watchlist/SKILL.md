@@ -123,8 +123,7 @@ After scaffolding, invoke the other skills in order:
 
 1. **fetch-prices** — backfill 2 years of data for each ticker (SMA 200 needs ~250 bars for warmup):
    ```bash
-   ./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 730
-   ./run .claude/skills/daily-update/scripts/fetch-prices.py AVGO --days 730
+   ./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA AVGO --days 730
    ```
    Before fetching, check if `data/_adhoc/{TICKER}/` exists. If so, move
    it to the group directory instead of fetching, then delete the

@@ -143,8 +143,7 @@ placement, then fetch prices in parallel. For each untracked ticker:
 
 3. For any ticker placed in a group or `_adhoc`:
    ```bash
-   ./run .claude/skills/daily-update/scripts/fetch-prices.py {TICKER} \
-     --csv data/{group}/{TICKER} --days 730
+   ./run .claude/skills/daily-update/scripts/fetch-prices.py {TICKER} --days 730
    ```
    If `data/_adhoc/{TICKER}/` already has data and you are moving
    it to a group, move the directory instead of re-fetching.

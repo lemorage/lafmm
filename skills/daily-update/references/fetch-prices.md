@@ -24,59 +24,49 @@ for a ticker and concatenates them chronologically.
 
 ## The script
 
-`scripts/fetch-prices.py` fetches closing prices for a ticker and writes to
+`scripts/fetch-prices.py` fetches closing prices and writes to
 year-partitioned CSVs. It is idempotent — running it twice produces the
-same result.
+same result. Built-in throttling prevents rate limiting.
 
 ```bash
-# Append latest prices (auto-discovers ticker dir under ~/.lafmm/data/)
-./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA
+# Fetch all tracked tickers (skips those updated within 3 days)
+./run .claude/skills/daily-update/scripts/fetch-prices.py
 
-# Explicit target (directory or file)
-./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --csv ~/.lafmm/data/semis/NVDA
+# Fetch specific tickers
+./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA AVGO
 
-# Backfill from a specific date
-./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --start 2026-01-02
+# Fetch one group
+./run .claude/skills/daily-update/scripts/fetch-prices.py --group semis
 
-# Last 30 calendar days
-./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 30
+# Force fetch all (even if recent)
+./run .claude/skills/daily-update/scripts/fetch-prices.py --all
 ```
 
-The script prints each new row as it appends. If the data is already up
-to date, it says so and exits.
+With no arguments, it discovers all tracked tickers by walking `data/`,
+skips those already up to date, and fetches the rest with built-in
+throttling. One invocation, no per-ticker orchestration needed.
 
 ## How to use it
 
-### Updating one ticker
+### Daily update (most common)
 
 ```bash
-./run .claude/skills/daily-update/scripts/fetch-prices.py SPY
+./run .claude/skills/daily-update/scripts/fetch-prices.py
 ```
 
-Auto-discovers `~/.lafmm/data/us-indices/SPY/` and appends to the
-current year's CSV.
+Discovers all groups and tickers, fetches only what is stale.
 
-### Updating an entire group
-
-Read `group.toml` for tickers, then fetch each:
+### Updating a specific group
 
 ```bash
-./run .claude/skills/daily-update/scripts/fetch-prices.py SPY
-./run .claude/skills/daily-update/scripts/fetch-prices.py QQQ
-./run .claude/skills/daily-update/scripts/fetch-prices.py DIA
-./run .claude/skills/daily-update/scripts/fetch-prices.py IWM
+./run .claude/skills/daily-update/scripts/fetch-prices.py --group us-indices
 ```
 
-### Populating a new group
-
-Backfill with 2 years of history for SMA 200 warmup and rich pivot structure:
+### Fetching specific tickers
 
 ```bash
-./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA --days 730
-./run .claude/skills/daily-update/scripts/fetch-prices.py AVGO --days 730
+./run .claude/skills/daily-update/scripts/fetch-prices.py NVDA AAPL SHOP
 ```
-
-730 calendar days gives roughly 500 trading days.
 
 ## What it produces
 
@@ -97,6 +87,10 @@ engine a continuous price series. The engine reads `close` for the
 Livermore FSM. `open/high/low` are available for quant skills (ATR,
 candlestick patterns). `volume` supports future liquidity analysis.
 
+Stock splits are detected automatically via yfinance metadata. When a
+split is found, historical CSVs are adjusted in place and a
+`.splits_applied` marker records the event.
+
 ## Prerequisites
 
 The script imports from the `lafmm` package. Run it with `./run` from
@@ -104,9 +98,9 @@ the workspace root. No manual setup needed.
 
 ## Error handling
 
-- **Ticker not found**: prints a message, exits without modifying CSVs.
+- **Ticker not found**: prints a message to stderr, continues others.
 - **Network failure**: exits without modifying CSVs. Run again later.
-- **Empty ticker dir**: creates it and writes data. Safe on new groups.
+- **Rate limiting**: stops after 2 consecutive empty fetches.
 - **Duplicate dates**: skipped automatically.
 - **Cross-year data**: automatically partitioned into correct year files.
 
