@@ -148,7 +148,7 @@ def _perf_pairs(data: dict) -> list[tuple[str, str]]:
     pf_c = _pf_color(pf)
 
     rt = d.get("round_trips", 0)
-    op = d.get("open_positions", 0)
+    op = len(d.get("open_positions", []))
     rt_label = f"{rt} [dim](+{op} open)[/]" if op > 0 else str(rt)
 
     pairs: list[tuple[str, str]] = [

@@ -39,7 +39,7 @@ Omit it when showing the user their stats.
   "buys": 95,
   "sells": 105,
   "round_trips": 45,
-  "open_positions": 1,
+  "open_positions": [{"symbol": "NVDA", "side": "long", "qty": 50, "avg_price": 128.50, "open_date": "2026-03-15", "signal": "BUY 10(d)"}],
   "wins": 30,
   "losses": 15,
   "breakeven": 0,
@@ -101,7 +101,7 @@ Omit it when showing the user their stats.
 ```
 
 Key fields for analysis:
-- `total_trades`: execution count (individual fills). `round_trips`: completed positions (flat→position→flat). `open_positions`: positions not yet flat
+- `total_trades`: execution count (individual fills). `round_trips`: completed positions (flat→position→flat). `open_positions`: array of currently held positions with symbol, side, qty, avg_price, open_date, signal
 - `wins`, `losses`, `win_rate`, `expectancy`, `profit_factor`: all computed from round trips, not individual executions
 - `rolling`: sliding window metrics over round trips (default window=10). shows edge stability over time
 - `robustness`: leave-one-out analysis. excludes best/worst PnL symbols and recomputes metrics. `reason` is "best" or "worst"

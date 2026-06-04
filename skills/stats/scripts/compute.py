@@ -76,6 +76,16 @@ class Position:
 
 
 @dataclass(frozen=True, slots=True)
+class OpenPosition:
+    symbol: str
+    side: str
+    qty: float
+    avg_price: float
+    open_date: str
+    signal: str
+
+
+@dataclass(frozen=True, slots=True)
 class SymbolStats:
     symbol: str
     pnl: float
@@ -133,7 +143,7 @@ class Stats:
     buys: int = 0
     sells: int = 0
     round_trips: int = 0
-    open_positions: int = 0
+    open_positions: tuple[OpenPosition, ...] = ()
     wins: int = 0
     losses: int = 0
     breakeven: int = 0
@@ -356,7 +366,7 @@ def _emit_position(
 
 def build_positions(
     trades: Sequence[Trade],
-) -> tuple[tuple[Position, ...], int]:
+) -> tuple[tuple[Position, ...], tuple[OpenPosition, ...]]:
     sorted_trades = sorted(trades, key=lambda t: (t.date, t.time))
     qty: dict[str, float] = defaultdict(float)
     open_dates: dict[str, str] = {}
@@ -429,8 +439,27 @@ def build_positions(
         peak[symbol] = open_qty
         qty[symbol] = new_qty
 
-    open_count = sum(1 for q in qty.values() if q != 0)
-    return tuple(positions), open_count
+    open_list: list[OpenPosition] = []
+    for symbol, q in qty.items():
+        if abs(q) < 1e-9:
+            continue
+        fills = accumulated.get(symbol, [])
+        total_cost = sum(t.qty * t.price for t in fills)
+        total_qty = sum(t.qty for t in fills)
+        avg_price = total_cost / total_qty if total_qty else 0.0
+        first_date = fills[0].date if fills else ""
+        signal = fills[0].signal if fills else ""
+        open_list.append(
+            OpenPosition(
+                symbol=symbol,
+                side="long" if q > 0 else "short",
+                qty=abs(q),
+                avg_price=round(avg_price, 2),
+                open_date=first_date,
+                signal=signal,
+            )
+        )
+    return tuple(positions), tuple(open_list)
 
 
 # ── Computation ──────────────────────────────────────────────────────
@@ -448,7 +477,7 @@ def compute(
         return Stats()
 
     all_trades = [t for e in entries for t in e.trades]
-    positions, open_count = build_positions(all_trades)
+    positions, open_pos = build_positions(all_trades)
     capitals = [(d, c) for d, c in capitals if c > 0] or capitals
 
     first = capitals[0][0] if capitals else entries[0].date
@@ -462,7 +491,7 @@ def compute(
         period=period_label,
         market_days=len(capitals) if capitals else len(entries),
         active_days=len(entries),
-        open_positions=open_count,
+        open_positions=open_pos,
         **_performance(all_trades, positions),
         **capital_data,
         **_risk(capitals, positions, flow_events),
