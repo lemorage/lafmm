@@ -34,15 +34,14 @@ Existing dates are skipped. Safe to re-run.
 Fetch from IBKR API, then parse:
 
 ```bash
+# Read token and query_id from accounts/{name}/account.toml [broker.api] section
 ./run .claude/skills/sync-trades/scripts/fetch_ibkr.py \
-  --token "$(toml get accounts/{name}/account.toml broker.api.token)" \
-  --query-id "$(toml get accounts/{name}/account.toml broker.api.query_id)" \
-  --out /tmp/trades.csv
+  --token TOKEN --query-id QUERY_ID --out /tmp/trades.csv
 
 ./run .claude/skills/sync-trades/scripts/parse_ibkr.py /tmp/trades.csv accounts/{name}/
 ```
 
-Read token and query_id from `accounts/{name}/account.toml`:
+Extract token and query_id from `accounts/{name}/account.toml`:
 
 ```toml
 [broker]

@@ -138,7 +138,7 @@ current sector leaders and apply the five criteria fresh.
 | Materials | Metals, chemicals, mining | FCX + NEM, or LIN + APD | Commodity-driven |
 | Telecom | Carriers, infrastructure | T + VZ | Low growth, dividend-focused |
 
-**For sectors not listed:** use news-context + WebSearch to identify the
+**For sectors not listed:** use the news-context skill to identify the
 two highest-volume, highest-market-cap names. Verify they meet the five
 criteria above.
 

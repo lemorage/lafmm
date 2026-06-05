@@ -40,9 +40,12 @@ breadth efficiently.
 
 ### Web search
 
-Use `WebSearch` for anything the curated feeds do not cover, or when you need
-the very latest information. Good for: breaking news, niche sectors, specific
-company events, verifying or deepening something you found in RSS.
+Use your web search tool (whatever is available — e.g. search_web, WebSearch)
+for anything the curated feeds do not cover, or when you need the very latest
+information. Good for: breaking news, niche sectors, specific company events,
+verifying or deepening something you found in RSS. If no search tool is
+available, rely on RSS feeds and Google News RSS queries (see feeds.md for
+how to construct custom queries for any ticker or topic).
 
 **Constructing good queries:** Include the ticker or company name, the
 specific event type, and a recency signal. "NVDA earnings guidance Q2 2026" is
@@ -53,11 +56,11 @@ better than "NVIDIA news". For macro topics, name the specific indicator:
 
 For a broad market scan (many sectors, general briefing), start with RSS —
 grab 2-3 tier-1 feeds from the reference file. For a targeted question about
-one stock or event, go straight to WebSearch. For thorough analysis, do both:
-RSS for systematic coverage, then WebSearch to fill gaps or chase specific
+one stock or event, go straight to web search. For thorough analysis, do both:
+RSS for systematic coverage, then web search to fill gaps or chase specific
 threads.
 
-You are not required to use both. A single WebSearch might be all you need. A
+You are not required to use both. A single web search might be all you need. A
 single RSS feed might be enough. Match the effort to the question.
 
 ## Making sense of what you find
@@ -126,7 +129,7 @@ is happening into a clear picture. The human decides what to do about it.
 User: "I'm thinking about adding a biotech group. What's happening in that
 sector right now?"
 
-You would: WebSearch for recent biotech catalysts (FDA decisions, clinical
+You would: web search for recent biotech catalysts (FDA decisions, clinical
 trial results, M&A), fetch the curated macro feeds to check if rate
 environment favors growth stocks, and summarize: which companies have active
 catalysts (E[CF]), whether the rate environment is favorable (r), and if
@@ -136,7 +139,7 @@ there are notable fund flows into/out of biotech ETFs (S/D).
 
 User: "NVDA dropped 8% today, why?"
 
-You would: WebSearch "NVDA stock drop today", check semiconductor and
+You would: web search "NVDA stock drop today", check semiconductor and
 broad market feeds, and report what you find — maybe it is an earnings miss
 (E[CF]), maybe it is a broad market sell-off from a hot CPI print (r), maybe
 it is an index rebalance (S/D), or some combination.
