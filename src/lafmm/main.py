@@ -63,21 +63,6 @@ def stats(account: str | None, period: str | None, benchmark: bool, as_json: boo
         click.echo("  use the sync-trades skill to import broker data first")
         return
 
-    data_dir = root / "data"
-    if data_dir.exists():
-        from lafmm.fetch import MIN_BARS, ensure_history, ensure_regime_data
-
-        regime_updated = ensure_regime_data(data_dir)
-        if regime_updated:
-            from lafmm.fetch import throttle
-
-            throttle()
-        trade_updated = ensure_history(account_dir, data_dir)
-        all_updated = regime_updated + trade_updated
-        if all_updated:
-            parts = [f"{name} ({count}/{MIN_BARS})" for name, count in all_updated]
-            click.echo(f"backfilled OHLCV: {', '.join(parts)}")
-
     data = run_compute(root, account_dir, period, benchmark)
     if as_json:
         click.echo(json_mod.dumps(data, indent=2))

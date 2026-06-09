@@ -21,8 +21,10 @@ from pathlib import Path
 
 from lafmm.fetch import (
     MIN_BARS,
+    REGIME_TICKERS,
     TRADING_TO_CALENDAR,
     _BackfillTarget,
+    _ref_dir,
     _throttled_backfill,
     find_ticker_dir,
     read_existing_dates,
@@ -40,8 +42,18 @@ _SKIP_DIRS = {"_meta", "_ref"}
 _STALE_DAYS = 3
 
 
+def _discover_regime(data_dir: Path) -> list[_BackfillTarget]:
+    ref_dir = _ref_dir(data_dir)
+    targets: list[_BackfillTarget] = []
+    for yahoo_ticker, local_name in REGIME_TICKERS.items():
+        ticker_dir = ref_dir / local_name
+        existing = read_existing_dates(ticker_dir)
+        targets.append(_BackfillTarget(yahoo_ticker, ticker_dir, local_name, frozenset(existing)))
+    return targets
+
+
 def _discover_all(data_dir: Path) -> list[_BackfillTarget]:
-    items: list[_BackfillTarget] = []
+    items: list[_BackfillTarget] = _discover_regime(data_dir)
     for group_dir in sorted(data_dir.iterdir()):
         if not group_dir.is_dir() or group_dir.name.startswith("."):
             continue

@@ -54,7 +54,8 @@ throttling. One invocation, no per-ticker orchestration needed.
 ./run .claude/skills/daily-update/scripts/fetch-prices.py
 ```
 
-Discovers all groups and tickers, fetches only what is stale.
+Discovers all groups, tickers, and regime reference data (VIX, VIX3M),
+fetches only what is stale.
 
 ### Updating a specific group
 

@@ -10,7 +10,7 @@ import time
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 from lafmm.quant.types import Bar
@@ -286,46 +286,3 @@ def _ref_dir(data_dir: Path) -> Path:
         if ref.is_dir():
             return ref
     return data_dir / "us-indices" / "_ref"
-
-
-# ── Public API ─────────────────────────────────────────────────────
-
-
-def ensure_regime_data(
-    data_dir: Path,
-    min_bars: int = MIN_BARS,
-) -> list[tuple[str, int]]:
-    ref = _ref_dir(data_dir)
-    end = date.today() + timedelta(days=1)
-    start = end - timedelta(days=int(min_bars * TRADING_TO_CALENDAR))
-    stale_threshold = (date.today() - timedelta(days=5)).isoformat()
-
-    items: list[_BackfillTarget] = []
-    for yahoo_ticker, local_name in REGIME_TICKERS.items():
-        ticker_dir = ref / local_name
-        existing = read_existing_dates(ticker_dir)
-        stale = bool(existing) and max(existing) < stale_threshold
-        if len(existing) < min_bars or stale:
-            items.append(_BackfillTarget(yahoo_ticker, ticker_dir, local_name, frozenset(existing)))
-    return _throttled_backfill(items, start, end)
-
-
-def ensure_history(
-    account_dir: Path,
-    data_dir: Path,
-    min_bars: int = MIN_BARS,
-) -> list[tuple[str, int]]:
-    traded = _traded_symbols(account_dir)
-    if not traded:
-        return []
-
-    end = date.today() + timedelta(days=1)
-    start = end - timedelta(days=int(min_bars * TRADING_TO_CALENDAR))
-
-    items: list[_BackfillTarget] = []
-    for symbol in sorted(traded):
-        ticker_dir = find_ticker_dir(data_dir, symbol) or data_dir / "_adhoc" / symbol
-        existing = read_existing_dates(ticker_dir)
-        if len(existing) < min_bars:
-            items.append(_BackfillTarget(symbol, ticker_dir, symbol, frozenset(existing)))
-    return _throttled_backfill(items, start, end)
