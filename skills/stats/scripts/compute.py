@@ -497,7 +497,7 @@ def compute(
         **_risk(capitals, positions, flow_events),
         **_costs(all_trades, positions),
         **_behavior(all_trades, positions, tracked_since),
-        **_exposure(positions),
+        **_exposure(positions, all_trades),
         rolling=_rolling(positions),
         robustness=_robustness(positions),
         genome=_classify_positions(positions, data_dir),
@@ -664,22 +664,27 @@ def _behavior(
     }
 
 
-def _exposure(positions: Sequence[Position]) -> dict:
-    by_symbol: dict[str, list[Position]] = defaultdict(list)
+def _exposure(positions: Sequence[Position], all_trades: Sequence[Trade]) -> dict:
     by_month: dict[str, float] = defaultdict(float)
-    for p in positions:
-        by_symbol[p.symbol].append(p)
-        for close in p.closes:
-            by_month[close.date[:7]] += close.pnl
+    realized_by_symbol: dict[str, float] = defaultdict(float)
+    traded_symbols: set[str] = set()
+    for t in all_trades:
+        traded_symbols.add(t.symbol)
+        if t.pnl:
+            by_month[t.date[:7]] += t.pnl
+            realized_by_symbol[t.symbol] += t.pnl
 
-    symbol_pnl = {s: sum(p.pnl for p in ps) for s, ps in by_symbol.items()}
-    gross_abs = sum(abs(v) for v in symbol_pnl.values())
-    top_pnl = max(abs(v) for v in symbol_pnl.values()) if symbol_pnl else 0.0
+    trips_by_symbol: dict[str, list[Position]] = defaultdict(list)
+    for p in positions:
+        trips_by_symbol[p.symbol].append(p)
+
+    gross_abs = sum(abs(v) for v in realized_by_symbol.values())
+    top_pnl = max(abs(v) for v in realized_by_symbol.values()) if realized_by_symbol else 0.0
     concentration = top_pnl / gross_abs * 100 if gross_abs > 0 else 0.0
 
     top: list[SymbolStats] = []
-    for symbol, pnl in sorted(symbol_pnl.items(), key=lambda x: x[1], reverse=True)[:10]:
-        symbol_positions = by_symbol[symbol]
+    for symbol, pnl in sorted(realized_by_symbol.items(), key=lambda x: x[1], reverse=True)[:10]:
+        symbol_positions = trips_by_symbol.get(symbol, [])
         trip_count = len(symbol_positions)
         win_count = sum(1 for p in symbol_positions if p.pnl > 0)
         loss_count = sum(1 for p in symbol_positions if p.pnl < 0)
@@ -695,7 +700,7 @@ def _exposure(positions: Sequence[Position]) -> dict:
         )
 
     return {
-        "symbols_traded": len(by_symbol),
+        "symbols_traded": len(traded_symbols),
         "concentration_pct": round(concentration, 1),
         "gross_abs_pnl": round(gross_abs, 2),
         "top_symbols": tuple(top),

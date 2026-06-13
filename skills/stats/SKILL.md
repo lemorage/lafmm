@@ -102,6 +102,7 @@ Omit it when showing the user their stats.
 
 Key fields for analysis:
 - `total_trades`: execution count (individual fills). `round_trips`: completed positions (flat→position→flat). `open_positions`: array of currently held positions with symbol, side, qty, avg_price, open_date, signal
+- `monthly_pnl`, `top_symbols` P&L, `concentration_pct`, `symbols_traded`: computed from per-execution realized P&L (includes partial closes on open positions)
 - `wins`, `losses`, `win_rate`, `expectancy`, `profit_factor`: all computed from round trips, not individual executions
 - `rolling`: sliding window metrics over round trips (default window=10). shows edge stability over time
 - `robustness`: leave-one-out analysis. excludes best/worst PnL symbols and recomputes metrics. `reason` is "best" or "worst"

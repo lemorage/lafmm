@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import itertools
 import json
 import re
@@ -12,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import click
+from rich.box import DOUBLE
 from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
@@ -33,45 +35,84 @@ MONTH_NAMES = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "O
 def render_stats(data: dict, console: Console | None = None) -> None:
     con = console or Console()
     con.print()
+
     _header(data, con)
-    con.print()
-    con.print(_grid("Performance", _perf_pairs(data)))
-    con.print()
-    con.print(_grid("Risk", _risk_pairs(data)))
-    for rob in data.get("robustness", []):
-        if rob.get("round_trips", 0) > 0:
-            reason = rob.get("reason", "")
-            title = f"excl. {reason} → {rob['excluded']}" if reason else f"excl. {rob['excluded']}"
-            con.print()
-            con.print(_grid(f"Robustness ({title})", _robustness_pairs(rob)))
-    if data.get("rolling"):
-        con.print()
-        _render_rolling(data, con)
-    con.print()
-    _monthly(data, con)
-    con.print()
-    _pnl_attribution(data, con)
-    con.print()
-    _symbols(data, con)
     con.print()
     con.print(_grid("Capital", _capital_pairs(data)))
     con.print()
     con.print(_grid("Costs & Income", _costs_pairs(data)))
+    _open_positions(data, con)
+
     con.print()
-    _behavior(data, con)
+    _section_realized(data, con)
+
+    con.print()
+    _section_performance(data, con)
+
+    con.print()
+
+
+def _capture(con: Console) -> Console:
+    return Console(width=con.width - 4, highlight=False, record=True, file=io.StringIO())
+
+
+def _section_realized(data: dict, con: Console) -> None:
+    inner = _capture(con)
+    _monthly(data, inner)
+    inner.print()
+    _pnl_attribution(data, inner)
+    inner.print()
+    _symbols(data, inner)
+    markup = inner.export_text(styles=True)
+    con.print(
+        Panel(
+            Text.from_ansi(markup.rstrip()),
+            title="[bold]Realized P&L[/]",
+            border_style="rgb(100,140,200)",
+            box=DOUBLE,
+            padding=(1, 1),
+        )
+    )
+
+
+def _section_performance(data: dict, con: Console) -> None:
+    inner = _capture(con)
+    inner.print(_grid("Performance", _perf_pairs(data)))
+    inner.print()
+    inner.print(_grid("Risk", _risk_pairs(data)))
+    for rob in data.get("robustness", []):
+        if rob.get("round_trips", 0) > 0:
+            reason = rob.get("reason", "")
+            title = f"Robustness (excl. {reason} → {rob['excluded']})" if reason else "Robustness"
+            inner.print()
+            inner.print(_grid(title, _robustness_pairs(rob)))
+    if data.get("rolling"):
+        inner.print()
+        _render_rolling(data, inner)
+    inner.print()
+    _behavior(data, inner)
     if data.get("genome"):
-        con.print()
-        _render_genome(data, con)
+        inner.print()
+        _render_genome(data, inner)
     if data.get("regime"):
-        con.print()
-        _render_regime(data, con)
-    con.print()
+        inner.print()
+        _render_regime(data, inner)
+    markup = inner.export_text(styles=True)
+    con.print(
+        Panel(
+            Text.from_ansi(markup.rstrip()),
+            title="[bold]Trade Analysis[/]",
+            border_style="rgb(100,140,200)",
+            box=DOUBLE,
+            padding=(1, 1),
+        )
+    )
 
 
 # ── Grid panel helper ───────────────────────────────────────────────
 
 
-def _grid(title: str, pairs: Sequence[tuple[str, str]]) -> Panel:
+def _grid_content(pairs: Sequence[tuple[str, str]]) -> Table:
     t = Table(box=None, show_header=False, expand=True, padding=(0, 1))
     t.add_column(style="bold", ratio=3)
     t.add_column(justify="right", ratio=2)
@@ -83,8 +124,13 @@ def _grid(title: str, pairs: Sequence[tuple[str, str]]) -> Panel:
         left = pairs[i]
         right = pairs[i + 1] if i + 1 < len(pairs) else ("", "")
         t.add_row(left[0], left[1], "", right[0], right[1])
+    return t
 
-    return Panel(t, title=f"[bold]{title}[/]", border_style="blue", padding=(1, 1))
+
+def _grid(title: str, pairs: Sequence[tuple[str, str]]) -> Panel:
+    return Panel(
+        _grid_content(pairs), title=f"[bold]{title}[/]", border_style="blue", padding=(1, 1)
+    )
 
 
 # ── Header with hero metrics ────────────────────────────────────────
@@ -137,6 +183,33 @@ def _second_row(data: dict, ret: float, spark: str) -> tuple[Text, Text]:
             Text.from_markup(f"[dim]SPY {spy:+.1f}%[/]    [{dc}]vs benchmark {diff:+.1f}%[/]"),
         )
     return (Text.from_markup(f"Equity  {spark}"), Text(""))
+
+
+# ── Open Positions ──────────────────────────────────────────────────
+
+
+def _open_positions(data: dict, con: Console) -> None:
+    open_raw = data.get("open_positions", [])
+    if not open_raw or isinstance(open_raw, int):
+        return
+    con.print()
+    t = Table(box=None, show_header=True, expand=True, padding=(0, 1))
+    t.add_column("Symbol", style="bold", no_wrap=True)
+    t.add_column("Side", no_wrap=True)
+    t.add_column("Qty", justify="right", no_wrap=True)
+    t.add_column("Avg Price", justify="right", no_wrap=True)
+    t.add_column("Opened", no_wrap=True)
+    t.add_column("Signal", style="dim", no_wrap=True)
+    for p in open_raw:
+        t.add_row(
+            p["symbol"],
+            p["side"],
+            f"{p['qty']:.0f}",
+            f"${p['avg_price']:,.2f}",
+            p["open_date"],
+            p.get("signal", "") or "\u2014",
+        )
+    con.print(Panel(t, title="[bold]Open Positions[/]", border_style="blue", padding=(1, 2)))
 
 
 # ── Section data ────────────────────────────────────────────────────
