@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.5
+
+- new: split stats into Realized P&L (per-execution) and Trade Analysis (round-trip) sections
+- new: expose open position details in stats JSON (symbol, qty, avg price, date, signal)
+- refactor: replace per-ticker fetch with bulk discovery and staleness gating
+- refactor: remove network fetching from stats command
+- fix: remove stale tool references from skill docs
+
 ## 0.6.4
 
 - new: auto-adjust historical prices on stock split during fetch
