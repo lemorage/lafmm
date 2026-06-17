@@ -76,13 +76,24 @@ def _discover_group(group_dir: Path) -> list[_BackfillTarget]:
     return items
 
 
+def _resolve_ticker_dir(data_dir: Path, symbol: str) -> Path:
+    found = find_ticker_dir(data_dir, symbol)
+    if found is not None:
+        return found
+    for group_dir in sorted(data_dir.iterdir()):
+        if not group_dir.is_dir() or group_dir.name in _SKIP_DIRS:
+            continue
+        candidate = group_dir / symbol
+        if candidate.is_dir():
+            return candidate
+    print(f"{symbol}: no group dir, using _adhoc", file=sys.stderr)
+    return data_dir / "_adhoc" / symbol
+
+
 def _discover_tickers(data_dir: Path, tickers: list[str]) -> list[_BackfillTarget]:
     items: list[_BackfillTarget] = []
     for symbol in tickers:
-        ticker_dir = find_ticker_dir(data_dir, symbol)
-        if ticker_dir is None:
-            print(f"{symbol}: not found in any group", file=sys.stderr)
-            continue
+        ticker_dir = _resolve_ticker_dir(data_dir, symbol)
         existing = read_existing_dates(ticker_dir)
         items.append(_BackfillTarget(symbol, ticker_dir, symbol, frozenset(existing)))
     return items
