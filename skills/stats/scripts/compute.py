@@ -364,6 +364,54 @@ def _emit_position(
     )
 
 
+_SPLITS_APPLIED = ".splits_applied"
+
+
+def _load_splits_for_symbol(data_dir: Path, symbol: str) -> list[tuple[str, float]]:
+    if not data_dir or not data_dir.is_dir():
+        return []
+    for group_dir in data_dir.iterdir():
+        if not group_dir.is_dir() or group_dir.name.startswith("."):
+            continue
+        marker = group_dir / symbol / _SPLITS_APPLIED
+        if not marker.exists():
+            continue
+        splits: list[tuple[str, float]] = []
+        for line in marker.read_text().splitlines():
+            line = line.strip()
+            if not line or "," not in line:
+                continue
+            d, r = line.split(",", 1)
+            ratio = float(r.strip())
+            if ratio > 0:
+                splits.append((d.strip(), ratio))
+        return sorted(splits)
+    return []
+
+
+def _split_adjust(trades: Sequence[Trade], data_dir: Path | None) -> list[Trade]:
+    if data_dir is None:
+        return list(trades)
+    by_symbol: dict[str, list[tuple[str, float]]] = {}
+    out: list[Trade] = []
+    for t in trades:
+        if t.symbol not in by_symbol:
+            by_symbol[t.symbol] = _load_splits_for_symbol(data_dir, t.symbol)
+        splits = by_symbol[t.symbol]
+        if not splits:
+            out.append(t)
+            continue
+        cumulative_ratio = 1.0
+        for split_date, ratio in splits:
+            if t.date < split_date:
+                cumulative_ratio *= ratio
+        if cumulative_ratio == 1.0:
+            out.append(t)
+            continue
+        out.append(replace(t, qty=t.qty * cumulative_ratio, price=t.price / cumulative_ratio))
+    return out
+
+
 def build_positions(
     trades: Sequence[Trade],
 ) -> tuple[tuple[Position, ...], tuple[OpenPosition, ...]]:
@@ -477,6 +525,7 @@ def compute(
         return Stats()
 
     all_trades = [t for e in entries for t in e.trades]
+    all_trades = _split_adjust(all_trades, data_dir)
     positions, open_pos = build_positions(all_trades)
     capitals = [(d, c) for d, c in capitals if c > 0] or capitals
 

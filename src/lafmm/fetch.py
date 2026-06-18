@@ -29,24 +29,36 @@ _MAX_CONSECUTIVE_FAILURES: int = 2
 _SPLITS_APPLIED = ".splits_applied"
 
 
-def _read_applied_splits(ticker_dir: Path) -> set[str]:
+def read_applied_splits(ticker_dir: Path) -> dict[str, float]:
+    """Return {date: ratio} for splits already applied to this ticker."""
     marker = ticker_dir / _SPLITS_APPLIED
     if not marker.exists():
-        return set()
-    return set(marker.read_text().splitlines())
+        return {}
+    splits: dict[str, float] = {}
+    for line in marker.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if "," in line:
+            date_str, ratio_str = line.split(",", 1)
+            splits[date_str.strip()] = float(ratio_str.strip())
+        else:
+            splits[line] = 0.0
+    return splits
 
 
-def _record_applied_split(ticker_dir: Path, split_date: str) -> None:
+def _record_applied_split(ticker_dir: Path, split_date: str, ratio: float) -> None:
     marker = ticker_dir / _SPLITS_APPLIED
-    applied = _read_applied_splits(ticker_dir)
-    applied.add(split_date)
-    marker.write_text("\n".join(sorted(applied)) + "\n")
+    applied = read_applied_splits(ticker_dir)
+    applied[split_date] = ratio
+    lines = [f"{d},{r}" for d, r in sorted(applied.items())]
+    marker.write_text("\n".join(lines) + "\n")
 
 
 def _unapplied_splits(
     symbol: str,
     since: str,
-    already_applied: set[str],
+    already_applied: dict[str, float],
 ) -> list[tuple[str, float]]:
     import yfinance as yf
 
@@ -86,11 +98,38 @@ def _adjust_csv_for_split(csv_path: Path, ratio: float) -> None:
     tmp.replace(csv_path)
 
 
+def _backfill_split_ratios(ticker_dir: Path, symbol: str, applied: dict[str, float]) -> None:
+    """Old marker files stored dates only. Backfill ratios from yfinance once."""
+    missing = [d for d, r in applied.items() if r == 0.0]
+    if not missing:
+        return
+    import yfinance as yf
+
+    ticker = yf.Ticker(symbol)
+    yfinance_splits = ticker.splits
+    if yfinance_splits is None or yfinance_splits.empty:
+        return
+    by_date = {
+        str(yfinance_splits.index[i])[:10]: float(yfinance_splits.iloc[i])
+        for i in range(len(yfinance_splits))
+    }
+    changed = False
+    for d in missing:
+        if d in by_date:
+            applied[d] = by_date[d]
+            changed = True
+    if changed:
+        marker = ticker_dir / _SPLITS_APPLIED
+        lines = [f"{d},{r}" for d, r in sorted(applied.items())]
+        marker.write_text("\n".join(lines) + "\n")
+
+
 def _apply_splits(ticker_dir: Path, symbol: str, existing: frozenset[str]) -> None:
     if not existing:
         return
     last_date = max(existing)
-    applied = _read_applied_splits(ticker_dir)
+    applied = read_applied_splits(ticker_dir)
+    _backfill_split_ratios(ticker_dir, symbol, applied)
     splits = _unapplied_splits(symbol, last_date, applied)
     if not splits:
         return
@@ -101,7 +140,7 @@ def _apply_splits(ticker_dir: Path, symbol: str, existing: frozenset[str]) -> No
         )
         for csv_file in ticker_dir.glob("*.csv"):
             _adjust_csv_for_split(csv_file, ratio)
-        _record_applied_split(ticker_dir, split_date)
+        _record_applied_split(ticker_dir, split_date, ratio)
 
 
 # ── Rate Limiting ──────────────────────────────────────────────────
