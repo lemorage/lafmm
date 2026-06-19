@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
 import csv
 import random
@@ -21,7 +22,6 @@ MIN_BARS = 250
 
 THROTTLE_BASE: float = 0.8
 THROTTLE_JITTER: float = 0.4
-_MAX_CONSECUTIVE_FAILURES: int = 2
 
 
 # ── Split Adjustment ──────────────────────────────────────────────
@@ -158,32 +158,57 @@ class _BackfillTarget:
     existing: frozenset[str]
 
 
+# 5 concurrent fetches keeps sustained rate ~1-2 req/s across typical
+# fetch latencies, well under yfinance's unauthenticated rate limit.
+_MAX_WORKERS = 5
+
+
+def _process_one(item: _BackfillTarget, start: date, end: date) -> tuple[str, int] | None:
+    bars = fetch_bars(item.symbol, start, end)
+    if not bars:
+        print(f"fetch {item.label}: no data", file=sys.stderr)
+        return None
+    _apply_splits(item.ticker_dir, item.symbol, item.existing)
+    new_bars = [bar for bar in bars if bar.date not in item.existing]
+    if not new_bars:
+        return None
+    added = write_bars(item.ticker_dir, new_bars)
+    if added == 0:
+        return None
+    return (item.label, len(item.existing) + added)
+
+
 def _throttled_backfill(
     items: Sequence[_BackfillTarget],
     start: date,
     end: date,
 ) -> list[tuple[str, int]]:
+    if not items:
+        return []
+    workers = min(_MAX_WORKERS, len(items))
     updated: list[tuple[str, int]] = []
-    consecutive_empty_fetches = 0
-    for i, item in enumerate(items):
-        if i > 0:
-            throttle()
-        bars = fetch_bars(item.symbol, start, end)
-        if not bars:
-            consecutive_empty_fetches += 1
-            print(f"fetch {item.label}: no data", file=sys.stderr)
-            if consecutive_empty_fetches >= _MAX_CONSECUTIVE_FAILURES:
-                print("rate limited — aborting", file=sys.stderr)
-                break
-            continue
-        consecutive_empty_fetches = 0
-        _apply_splits(item.ticker_dir, item.symbol, item.existing)
-        new_bars = [bar for bar in bars if bar.date not in item.existing]
-        if not new_bars:
-            continue
-        added = write_bars(item.ticker_dir, new_bars)
-        if added > 0:
-            updated.append((item.label, len(item.existing) + added))
+    empty_count = 0
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(_process_one, item, start, end): item for item in items}
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                result = future.result()
+            except Exception as exc:
+                item = futures[future]
+                print(f"fetch {item.label}: error {exc}", file=sys.stderr)
+                empty_count += 1
+                continue
+            if result is None:
+                empty_count += 1
+                continue
+            updated.append(result)
+
+    if empty_count and empty_count >= len(items) // 2:
+        print(
+            f"warning: {empty_count}/{len(items)} fetches empty — possible rate limit",
+            file=sys.stderr,
+        )
     return updated
 
 
