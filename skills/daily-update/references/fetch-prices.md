@@ -26,10 +26,11 @@ for a ticker and concatenates them chronologically.
 
 `scripts/fetch-prices.py` fetches closing prices and writes to
 year-partitioned CSVs. It is idempotent — running it twice produces the
-same result. Built-in throttling prevents rate limiting.
+same result. Bounded parallelism (5 workers) keeps sustained rate well
+under yfinance's unauthenticated limit.
 
 ```bash
-# Fetch all tracked tickers (skips those updated within 3 days)
+# Fetch all tracked tickers missing today's bar
 ./run .claude/skills/daily-update/scripts/fetch-prices.py
 
 # Fetch specific tickers
@@ -38,13 +39,13 @@ same result. Built-in throttling prevents rate limiting.
 # Fetch one group
 ./run .claude/skills/daily-update/scripts/fetch-prices.py --group semis
 
-# Force fetch all (even if recent)
+# Force fetch all (even if today's bar exists)
 ./run .claude/skills/daily-update/scripts/fetch-prices.py --all
 ```
 
 With no arguments, it discovers all tracked tickers by walking `data/`,
-skips those already up to date, and fetches the rest with built-in
-throttling. One invocation, no per-ticker orchestration needed.
+skips those that already have today's bar, and fetches the rest in
+parallel. One invocation, no per-ticker orchestration needed.
 
 ## How to use it
 
@@ -55,7 +56,7 @@ throttling. One invocation, no per-ticker orchestration needed.
 ```
 
 Discovers all groups, tickers, and regime reference data (VIX, VIX3M),
-fetches only what is stale.
+fetches only those missing today's bar.
 
 ### Updating a specific group
 

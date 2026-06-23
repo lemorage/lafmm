@@ -9,6 +9,10 @@ Usage:
 With no arguments, fetches all tracked tickers across all groups.
 With tickers, fetches only those. With --group, fetches that group.
 
+By default, only tickers missing today's bar are fetched. Use --all to
+force-fetch everything regardless. Use --days N for explicit backfill
+window (e.g., new-group warmup).
+
 SPDX-License-Identifier: GPL-3.0-only
 """
 
@@ -39,7 +43,6 @@ def _data_dir() -> Path:
 
 
 _SKIP_DIRS = {"_meta", "_ref"}
-_STALE_DAYS = 3
 
 
 def _discover_regime(data_dir: Path) -> list[_BackfillTarget]:
@@ -99,16 +102,18 @@ def _discover_tickers(data_dir: Path, tickers: list[str]) -> list[_BackfillTarge
     return items
 
 
-def _stale_only(items: list[_BackfillTarget]) -> list[_BackfillTarget]:
-    threshold = (date.today() - timedelta(days=_STALE_DAYS)).isoformat()
-    return [item for item in items if not item.existing or max(item.existing) < threshold]
+def _missing_today(items: list[_BackfillTarget]) -> list[_BackfillTarget]:
+    today = date.today().isoformat()
+    return [item for item in items if not item.existing or max(item.existing) < today]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch daily OHLCV prices")
     parser.add_argument("tickers", nargs="*", help="ticker symbols (omit for all)")
     parser.add_argument("--group", default=None, help="fetch a specific group")
-    parser.add_argument("--all", action="store_true", help="fetch even if recent")
+    parser.add_argument(
+        "--all", action="store_true", help="force fetch all, even if today's bar exists"
+    )
     parser.add_argument("--days", type=int, default=None, help="lookback in calendar days")
     args = parser.parse_args()
 
@@ -129,7 +134,7 @@ def main() -> None:
         items = _discover_all(data_dir)
 
     if not args.all:
-        items = _stale_only(items)
+        items = _missing_today(items)
 
     if not items:
         print("all tickers up to date")
