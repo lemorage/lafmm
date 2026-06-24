@@ -26,7 +26,7 @@ import re
 import sys
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 ORDER_MAP: Mapping[str, str] = {"LMT": "limit", "MKT": "market", "STP": "stop"}
@@ -226,6 +226,7 @@ class ImportStats:
     skipped: int
     trades: int
     cash_flows: int
+    backfilled_signals: int = 0
 
 
 def parse_csv(
@@ -445,6 +446,89 @@ def write_journal(
     )
 
 
+def backfill_journal_signals(
+    journal_dir: Path,
+    signals: SignalIndex,
+    tracked_since: str,
+) -> int:
+    """Re-evaluate trade rows with placeholder signal against current cache.
+
+    Idempotent: only fills rows where signal column is the placeholder. Real
+    signals (auto-filled or user-edited) are never overwritten.
+    """
+    if not signals or not tracked_since:
+        return 0
+    if not journal_dir.is_dir():
+        return 0
+
+    cutoff = tracked_since.replace("-", "")
+    filled = 0
+
+    for md_file in sorted(journal_dir.rglob("*.md")):
+        if md_file.name == "README.md":
+            continue
+        date_str = _journal_date_from_path(md_file)
+        if not date_str or date_str < cutoff:
+            continue
+        original = md_file.read_text()
+        rewritten = _backfill_file_lines(original, signals, _to_iso(date_str))
+        if rewritten is None:
+            continue
+        md_file.write_text(rewritten[0])
+        filled += rewritten[1]
+    return filled
+
+
+def _journal_date_from_path(path: Path) -> str:
+    parts = path.stem.split("-")
+    if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+        return ""
+    year = path.parent.name
+    if not year.isdigit() or len(year) != 4:
+        return ""
+    return f"{year}{parts[0]}{parts[1]}"
+
+
+def _to_iso(date_str: str) -> str:
+    return f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
+
+
+def _backfill_file_lines(
+    text: str,
+    signals: SignalIndex,
+    iso_date: str,
+) -> tuple[str, int] | None:
+    out: list[str] = []
+    changed = 0
+    for line in text.splitlines():
+        new_line = _maybe_fill_signal(line, signals, iso_date)
+        if new_line != line:
+            changed += 1
+        out.append(new_line)
+    if changed == 0:
+        return None
+    return ("\n".join(out) + ("\n" if text.endswith("\n") else ""), changed)
+
+
+def _maybe_fill_signal(line: str, signals: SignalIndex, iso_date: str) -> str:
+    if not line.startswith("| ") or not line.endswith(" |"):
+        return line
+    parts = [p.strip() for p in line.split("|")[1:-1]]
+    if len(parts) != 10:
+        return line
+    if parts[9] != "—":
+        return line
+    symbol = parts[1]
+    side = parts[2]
+    if side not in ("buy", "sell"):
+        return line
+    new_signal = lookup_signal(signals, symbol, iso_date.replace("-", ""), side)
+    if new_signal == "—":
+        return line
+    parts[9] = new_signal
+    return "| " + " | ".join(parts) + " |"
+
+
 def write_capital(capital_dir: Path, nav: dict[str, float]) -> int:
     capital_dir.mkdir(parents=True, exist_ok=True)
 
@@ -512,6 +596,8 @@ def main() -> None:
     cash = normalize_cash(raw_cash)
 
     stats = write_journal(journal_dir, trades, cash, nav, signals, tracked_since)
+    backfilled = backfill_journal_signals(journal_dir, signals, tracked_since)
+    stats = replace(stats, backfilled_signals=backfilled)
     capital_rows = write_capital(capital_dir, nav)
 
     forex = len(raw_trades) - len(trades)
@@ -527,6 +613,7 @@ def main() -> None:
                 "new_files": stats.new_files,
                 "skipped": stats.skipped,
                 "cash_flows": stats.cash_flows,
+                "backfilled_signals": stats.backfilled_signals,
                 "forex_filtered": forex,
                 "capital_rows": capital_rows,
                 "date_range": date_range.strip(),
